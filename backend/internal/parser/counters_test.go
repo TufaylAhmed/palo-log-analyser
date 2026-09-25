@@ -1,0 +1,967 @@
+package parser
+
+import (
+	"bytes"
+	"strings"
+	"testing"
+	"time"
+)
+
+const sampleDpMonitor = `2026-06-09 11:27:40.087 -0700  --- panio
+:Global counters:
+:Elapsed time since last sampling: 424.219 seconds
+:name                                 value     rate
+:-------------------------------------------------------------------------------
+:pkt_recv                           6452370      103
+:pkt_recv_retry                       32864        0
+:Total counters shown: 2
+:
+:Global counters:
+:Elapsed time since last sampling: 10.001 seconds
+:name                                 value     rate
+:-------------------------------------------------------------------------------
+:pkt_recv                                99        9
+:Total counters shown: 1
+:
+:Resource monitoring statistics (per minute):
+:CPU load (%) during last 15 minutes:
+:core    0       1       2       3
+:     avg max avg max avg max avg max
+:       0   0   1   1   1   1   0   0
+:       0   0   1   2   1   2   0   0
+:Cache-Type             MAX-Entries Cur-Entries Max.Alloc Cur.SZ(B) Insert-Failure Mem-Pool-Type
+:ssl_server_cert        16384       176         176       14080     0              l7_misc
+:ssl_cert_cn            1024        12          12        960       0              l7_misc
+:		Per pan-task counter statistics
+:Counter Name                                      1                    2                Total
+:-----------------------------------------------------------------------------------
+:pkt_recv                                    1657994              4663514              6321508
+:mem_memseg_allocated                              1                    0                    1
+2026-06-09 11:29:44.537 -0700  --- cpu
+Last 180 seconds
+Avg (%)    Max (%)
+17         24
+Load Avg:
+1.44 1.67 1.58 1/1449 498878
+2026-06-09 11:30:00.000 -0700  --- ifconfig
+ 1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+    inet 127.0.0.1/24 scope host lo
+    RX:  bytes packets errors dropped  missed   mcast
+    2572190192 9666206      0       1       0       0
+    TX:  bytes packets errors dropped carrier collsns
+    2572190192 9666206      0       0       2       3
+2026-06-09 11:31:00.000 -0700  --- memory
+Last 180 seconds
+Type       Free (kB)     min (kB)      Total (kB)    MemAvailable (kB)
+Mem        429592        424240        8111956       1881560
+Swap       3096060       3095804       4095996
+2026-06-09 12:27:40.973 -0700  --- logrcvr_statistics
+Logreceiver-Statistics
+ Log incoming rate:             8/sec
+ Log written rate:              2/sec
+ Traffic logs written:          22176
+ Total (MB):                416
+ Log incoming rate:             999/sec
+2026-06-09 12:28:00.000 -0700  --- netstat_detail
+Active Internet connections (servers and established)
+Proto Recv-Q Send-Q Local Address           Foreign Address         State       PID/Program name
+tcp        0      0 0.0.0.0:28778           0.0.0.0:*               LISTEN      3355/gp_broker
+tcp        5      2 0.0.0.0:28776           0.0.0.0:*               LISTEN      3367/sslmgr
+tcp6       3      0 :::28769                :::*                    LISTEN      3355/gp_broker
+tcp        0      0 127.0.0.1:42660         127.0.0.1:28888         ESTABLISHED -
+`
+
+func collectFromString(t *testing.T, content, plane string) Series {
+	t.Helper()
+	tgz := buildMultiTgz(t, map[string]string{"var/log/pan/" + plane + "-monitor.log": content})
+	samples, err := CollectAllCounters(bytes.NewReader(tgz), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return samples
+}
+
+func TestGlobalCountersKeepLongElapsedOnly(t *testing.T) {
+	got := collectFromString(t, sampleDpMonitor, "dp")
+
+	ss, ok := got["dp__gc__pkt_recv"]
+	if !ok {
+		t.Fatal("dp__gc__pkt_recv missing")
+	}
+	// only the 424s sample; the 10s delta (value 99) must be dropped
+	if len(ss) != 1 || ss[0].Value != 6452370 {
+		t.Fatalf("dp__gc__pkt_recv = %+v, want single sample 6452370", ss)
+	}
+	if got["dp__gc__pkt_recv_retry"][0].Value != 32864 {
+		t.Fatalf("pkt_recv_retry wrong: %+v", got["dp__gc__pkt_recv_retry"])
+	}
+}
+
+func TestCpu15mPerMinuteRows(t *testing.T) {
+	got := collectFromString(t, sampleDpMonitor, "dp")
+
+	avg1 := got["dp__cpu__01_avg"]
+	max1 := got["dp__cpu__01_max"]
+	if len(avg1) != 2 || len(max1) != 2 {
+		t.Fatalf("core1: got %d avg / %d max samples, want 2/2", len(avg1), len(max1))
+	}
+	// first row = block ts, second row = one minute earlier
+	blockTs, _ := time.Parse("2006-01-02 15:04:05", "2026-06-09 11:27:40")
+	// store order follows file order; sample[0] is row 0
+	if !avg1[0].Ts.Equal(blockTs) || !avg1[1].Ts.Equal(blockTs.Add(-time.Minute)) {
+		t.Fatalf("row timestamps wrong: %v, %v", avg1[0].Ts, avg1[1].Ts)
+	}
+	if avg1[1].Value != 1 || max1[1].Value != 2 {
+		t.Fatalf("core1 row2 = avg %v max %v, want 1/2", avg1[1].Value, max1[1].Value)
+	}
+	if _, ok := got["dp__cpu__00_avg"]; !ok {
+		t.Fatal("zero-padded core name dp__cpu__00_avg missing")
+	}
+}
+
+func TestCacheTypeTable(t *testing.T) {
+	got := collectFromString(t, sampleDpMonitor, "dp")
+
+	want := map[string]float64{
+		"dp__ct__ssl_server_cert_max_entries":    16384,
+		"dp__ct__ssl_server_cert_cur_entries":    176,
+		"dp__ct__ssl_server_cert_max_alloc":      176,
+		"dp__ct__ssl_server_cert_cur_sz_b":       14080,
+		"dp__ct__ssl_server_cert_insert_failure": 0,
+		"dp__ct__ssl_cert_cn_cur_entries":        12,
+	}
+	for name, v := range want {
+		ss, ok := got[name]
+		if !ok {
+			t.Errorf("missing %s", name)
+			continue
+		}
+		if ss[0].Value != v {
+			t.Errorf("%s = %v, want %v", name, ss[0].Value, v)
+		}
+	}
+	for name := range got {
+		if name == "dp__ct__ssl_server_cert_l7_misc" {
+			t.Error("mem-pool-type must not be tracked")
+		}
+	}
+}
+
+func TestCpuBlock(t *testing.T) {
+	got := collectFromString(t, sampleDpMonitor, "dp")
+
+	want := map[string]float64{
+		"dp__cpu__last_3m_avg_pct": 17,
+		"dp__cpu__last_3m_max_pct": 24,
+		"dp__cpu_load_avg__l_1":    1.44,
+		"dp__cpu_load_avg__l_5":    1.67,
+		"dp__cpu_load_avg__l_15":   1.58,
+	}
+	for name, v := range want {
+		ss, ok := got[name]
+		if !ok {
+			t.Errorf("missing %s", name)
+			continue
+		}
+		if ss[0].Value != v {
+			t.Errorf("%s = %v, want %v", name, ss[0].Value, v)
+		}
+	}
+}
+
+func TestPerTaskCounters(t *testing.T) {
+	got := collectFromString(t, sampleDpMonitor, "dp")
+
+	want := map[string]float64{
+		"dp__gc01__pkt_recv":             1657994,
+		"dp__gc02__pkt_recv":             4663514,
+		"dp__gc01__mem_memseg_allocated": 1,
+		"dp__gc02__mem_memseg_allocated": 0,
+	}
+	for name, v := range want {
+		ss, ok := got[name]
+		if !ok {
+			t.Errorf("missing %s", name)
+			continue
+		}
+		if ss[0].Value != v {
+			t.Errorf("%s = %v, want %v", name, ss[0].Value, v)
+		}
+	}
+	// the Total column must not become a counter
+	for name := range got {
+		if name == "dp__gc03__pkt_recv" {
+			t.Error("Total column was wrongly mapped")
+		}
+	}
+}
+
+func TestIfconfig(t *testing.T) {
+	got := collectFromString(t, sampleDpMonitor, "dp")
+
+	want := map[string]float64{
+		"dp__ifconfig__lo_rx_bytes":   2572190192,
+		"dp__ifconfig__lo_rx_packets": 9666206,
+		"dp__ifconfig__lo_rx_dropped": 1,
+		"dp__ifconfig__lo_tx_bytes":   2572190192,
+		"dp__ifconfig__lo_tx_carrier": 2,
+		"dp__ifconfig__lo_tx_collsns": 3,
+		"dp__ifconfig__lo_tx_dropped": 0,
+	}
+	for name, v := range want {
+		ss, ok := got[name]
+		if !ok {
+			t.Errorf("missing %s", name)
+			continue
+		}
+		if ss[0].Value != v {
+			t.Errorf("%s = %v, want %v", name, ss[0].Value, v)
+		}
+	}
+}
+
+func TestMemoryBlock(t *testing.T) {
+	got := collectFromString(t, sampleDpMonitor, "dp")
+
+	want := map[string]float64{
+		"dp__memory__mem_free":      429592,
+		"dp__memory__mem_available": 1881560,
+		"dp__memory__mem_total":     8111956,
+		"dp__memory__swap_free":     3096060,
+		"dp__memory__swap_total":    4095996,
+	}
+	for name, v := range want {
+		ss, ok := got[name]
+		if !ok {
+			t.Errorf("missing %s", name)
+			continue
+		}
+		if ss[0].Value != v {
+			t.Errorf("%s = %v, want %v", name, ss[0].Value, v)
+		}
+	}
+}
+
+func TestLogrcvrStatistics(t *testing.T) {
+	got := collectFromString(t, sampleDpMonitor, "dp")
+
+	if v := got["dp__logreceiver_statistics__log_incoming_rate"]; len(v) != 1 || v[0].Value != 8 {
+		t.Fatalf("log_incoming_rate = %+v, want single sample 8 (lines after Total must be ignored)", v)
+	}
+	if v := got["dp__logreceiver_statistics__log_written_rate"]; len(v) != 1 || v[0].Value != 2 {
+		t.Fatalf("log_written_rate = %+v", v)
+	}
+	if v := got["dp__logreceiver_statistics__total_mb"]; len(v) != 1 || v[0].Value != 416 {
+		t.Fatalf("total_mb = %+v", v)
+	}
+	if _, ok := got["dp__logreceiver_statistics__traffic_logs_written"]; ok {
+		t.Fatal("traffic_logs_written must not be captured")
+	}
+}
+
+func TestNetstatDetail(t *testing.T) {
+	got := collectFromString(t, sampleDpMonitor, "dp")
+
+	want := map[string]float64{
+		"dp__netstat_detail__tcp_gp_broker_recv_q":  0,
+		"dp__netstat_detail__tcp_sslmgr_recv_q":     5,
+		"dp__netstat_detail__tcp_sslmgr_send_q":     2,
+		"dp__netstat_detail__tcp6_gp_broker_recv_q": 3,
+	}
+	for name, v := range want {
+		ss, ok := got[name]
+		if !ok {
+			t.Errorf("missing %s", name)
+			continue
+		}
+		if ss[0].Value != v {
+			t.Errorf("%s = %v, want %v", name, ss[0].Value, v)
+		}
+	}
+	// the ESTABLISHED row without a program must be skipped (no counter named after "-")
+	for name := range got {
+		if strings.Contains(name, "netstat_detail") && strings.Contains(name, "__tcp__") {
+			t.Errorf("unexpected counter from program-less row: %s", name)
+		}
+	}
+}
+
+func TestMpPrefix(t *testing.T) {
+	got := collectFromString(t, sampleDpMonitor, "mp")
+	if _, ok := got["mp__cpu_load_avg__l_1"]; !ok {
+		t.Fatal("mp prefix not applied")
+	}
+}
+
+const sampleDpExtra = `2026-06-09 13:00:00.000 -0700  --- netstat_stats
+Ip:
+    Forwarding: 2
+    11080749 total packets received
+    0 forwarded
+    0 incoming packets discarded
+    11064314 incoming packets delivered
+    10973710 requests sent out
+Tcp:
+    203928 active connection openings
+    175430 passive connection openings
+TcpExt:
+    173188 TCP sockets finished time wait in fast timer
+    2473 time wait sockets recycled by time stamp
+IpExt:
+    InECT0Pkts: 506
+2026-06-09 13:08:37.779 -0700  --- processes
+Total num processes: 0
+Name                   PID      CPU%  FDs Open   Virt Mem     Res+Swap     State      Res+Swap-Lazy
+envoy                  8641     6     40         2281204      20040        S 231028
+2026-06-09 14:23:45.233 -0700  --- filesystem
+Mount            Used (%)   Used (kB)
+/                51         5875792
+/dev             0          0
+/dev/shm         53         2522168
+2026-06-09 15:00:00.000 -0700  --- panio
+:Mem-Pool-Type    MaxSz(KB) Threshold MinSz(KB)  CurSz(B) Max.Alloc   Cur.Alloc Total-Alloc Fail-Thresh  Fail-Nomem Local-Reuse(cache)
+:ctd_dlp_buf           1016     52480       508         0         0         0           0           0           0           0(0)
+:proxy                25600         0         0   3053760   3114864     81673       95234           0           0           0(0)
+:clientless_vpn        3399         0         0         0         0         0           0           0           0
+:Software Pools
+:Id   Name                      Length         Free/Total      HighWm/Populated  Used/Total  DataRange                  CacheSz
+:[ 0] memseg_common             (2097152):       86/88              2/88            1/1      0xd001400000-0xd00c400000
+:[ 1] Shared Pool 24            (     24):   443976/444000        784/87376         1/6      0xd00c800080-0xd00ca00000* 408
+:Pow Atomic Memory Pools
+:[ 0] Work Queue Entries        :    25166/25206    0xd0146f8d00
+:[ 1] Packet Buffers            :    30076/31141    0x10181f6c0
+:User                     Quota     Threshold Min.Alloc Cur.Alloc Max.Alloc Total-Alloc Fail-Thresh Fail-Nomem  Local-Reuse Data(Pool)-SZ
+:fptcp_seg                25000     0         0         0         25        3802        0           0           3795        16 (24)
+`
+
+func wantValues(t *testing.T, got Series, want map[string]float64) {
+	t.Helper()
+	for name, v := range want {
+		ss, ok := got[name]
+		if !ok {
+			t.Errorf("missing %s", name)
+			continue
+		}
+		if ss[0].Value != v {
+			t.Errorf("%s = %v, want %v", name, ss[0].Value, v)
+		}
+	}
+}
+
+func TestNetstatStats(t *testing.T) {
+	got := collectFromString(t, sampleDpExtra, "dp")
+	wantValues(t, got, map[string]float64{
+		"dp__nsstats__ip__forwarding":                 2,
+		"dp__nsstats__ip__total_packets_received":     11080749,
+		"dp__nsstats__ip__forwarded":                  0,
+		"dp__nsstats__ip__incoming_packets_discarded": 0,
+		"dp__nsstats__ip__incoming_packets_delivered": 11064314,
+		"dp__nsstats__ip__requests_sent_out":          10973710,
+		"dp__nsstats__tcp__active_connection_openings":                       203928,
+		"dp__nsstats__tcp__passive_connection_openings":                      175430,
+		"dp__nsstats__tcpext__tcp_sockets_finished_time_wait_in_fast_timer":  173188,
+		"dp__nsstats__tcpext__time_wait_sockets_recycled_by_time_stamp":      2473,
+		"dp__nsstats__ipext__inect0pkts":                                     506,
+	})
+}
+
+func TestProcesses(t *testing.T) {
+	got := collectFromString(t, sampleDpExtra, "dp")
+	wantValues(t, got, map[string]float64{
+		"dp__processes__envoy_8641_cpu":           6,
+		"dp__processes__envoy_8641_fds_open":      40,
+		"dp__processes__envoy_8641_virt_mem":      2281204,
+		"dp__processes__envoy_8641_res_swap":          20040,
+		"dp__processes__envoy_8641_res_swap_sub_lazy": 231028,
+	})
+	for name := range got {
+		if name == "dp__processes__name_pid_cpu" {
+			t.Error("header row was parsed as a process")
+		}
+	}
+}
+
+func TestFilesystem(t *testing.T) {
+	got := collectFromString(t, sampleDpExtra, "dp")
+	wantValues(t, got, map[string]float64{
+		"dp__filesystem__root_pct":         51,
+		"dp__filesystem__root_used_kb":     5875792,
+		"dp__filesystem__dev_pct":          0,
+		"dp__filesystem__dev_used_kb":      0,
+		"dp__filesystem__dev_shm_pct":      53,
+		"dp__filesystem__dev_shm_used_kb":  2522168,
+	})
+}
+
+func TestMemPool(t *testing.T) {
+	got := collectFromString(t, sampleDpExtra, "dp")
+	wantValues(t, got, map[string]float64{
+		"dp__pool__mempool__ctd_dlp_buf_max_sz_kb":  1016,
+		"dp__pool__mempool__ctd_dlp_buf_threshold":  52480,
+		"dp__pool__mempool__ctd_dlp_buf_min_sz_kb":  508,
+		"dp__pool__mempool__proxy_cur_sz_b":         3053760,
+		"dp__pool__mempool__proxy_max_alloc":        3114864,
+		"dp__pool__mempool__proxy_cur_alloc":        81673,
+		"dp__pool__mempool__proxy_total_alloc":      95234,
+		"dp__pool__mempool__proxy_local_reuse":      0,
+		"dp__pool__mempool__clientless_vpn_max_sz_kb": 3399,
+	})
+	// short row: clientless_vpn has no Local-Reuse column
+	if _, ok := got["dp__pool__mempool__clientless_vpn_local_reuse"]; ok {
+		t.Error("short row should not emit a missing trailing column")
+	}
+}
+
+func TestSoftPool(t *testing.T) {
+	got := collectFromString(t, sampleDpExtra, "dp")
+	wantValues(t, got, map[string]float64{
+		"dp__pool__softpool__memseg_common":  86,
+		"dp__pool__softpool__shared_pool_24": 443976,
+	})
+	if v := got["dp__pool__softpool__memseg_common_pct"]; len(v) != 1 || v[0].Value != 86.0/88.0 {
+		t.Fatalf("memseg_common_pct = %+v, want %v", v, 86.0/88.0)
+	}
+}
+
+func TestPowPool(t *testing.T) {
+	got := collectFromString(t, sampleDpExtra, "dp")
+	wantValues(t, got, map[string]float64{
+		"dp__pool__powpool__work_queue_entries": 25166,
+		"dp__pool__powpool__packet_buffers":     30076,
+	})
+	if v := got["dp__pool__powpool__packet_buffers_pct"]; len(v) != 1 || v[0].Value != 30076.0/31141.0 {
+		t.Fatalf("packet_buffers_pct = %+v, want %v", v, 30076.0/31141.0)
+	}
+}
+
+func TestSharedPool(t *testing.T) {
+	got := collectFromString(t, sampleDpExtra, "dp")
+	wantValues(t, got, map[string]float64{
+		"dp__pool__sharedpool__fptcp_seg_quota":       25000,
+		"dp__pool__sharedpool__fptcp_seg_threshold":   0,
+		"dp__pool__sharedpool__fptcp_seg_max_alloc":   25,
+		"dp__pool__sharedpool__fptcp_seg_total_alloc": 3802,
+		"dp__pool__sharedpool__fptcp_seg_local_reuse": 3795,
+	})
+	// Data(Pool)-SZ must not be emitted
+	if _, ok := got["dp__pool__sharedpool__fptcp_seg_data_pool_sz"]; ok {
+		t.Error("Data(Pool)-SZ column should be excluded")
+	}
+}
+
+const sampleDpProc = `2026-06-09 16:00:00.000 -0700  --- panio
+:func                                  max-us   avg-us        count     total-us  ac-max-us  ac-avg-us         ac-count      ac-total-us
+:dfa_match                                114      1.1        24302        27413      84049        4.6           175978           811293
+:ldl_mlc2_http_ort_load                     0      0.0            0            0          0        0.0                0                0
+:group                                 max-us   avg-us        count     total-us  ac-max-us  ac-avg-us         ac-count      ac-total-us
+:aho_result                                 0      0.0            0            0          0        0.0                0                0
+:flow_fastpath (group)
+:col    avg-ticks   avg-us        count     total-us
+: 10         1792        0            1            0
+:dfa_match (func)
+:col    avg-ticks   avg-us        count     total-us
+:  9          929        0           36           15
+:Resource utilization (%) during last 15 minutes:
+:session (average):
+:  0   0   0   0   0   0   0   0   0   0   0   0   0   0   0
+:session (maximum):
+:  0   0   0   0   1   0   0   0   0   0   0   0   0   0   0
+:packet buffer (average):
+:  3   3   3   3   3   3   3   3   3   3   3   3   3   3   3
+:sw tags descriptor (maximum):
+:  6   6   5   5   5   5   5   5   6   6   5   5   6   6   5
+:Number of sessions supported:                    65536
+:Number of allocated sessions:                    21
+:Number of active TCP sessions:                   8
+:Number of active SCTP associations:              0
+:Session table utilization:                       0%
+:Number of sessions created since bootup:         68946
+:Packet rate:                                     194/s
+:Throughput:                                      1271 kbps
+:New connection establish rate:                   4 cps
+:  TCP default timeout:                           3600 secs
+:  Session timeout in discard state:
+:    TCP: 90 secs, UDP: 60 secs, SCTP: 30 secs, other IP protocols: 60 secs
+:Session accelerated aging:                       True
+:  Hardware session offloading:                   False
+:  ICMP Unreachable Packet Rate:                  200 pps
+:Pcap token bucket rate                         : 10485760
+2026-06-09 16:05:00.000 -0700  --- top
+top - 14:17:34 up 15:02,  0 users,  load average: 0.84, 1.07, 1.19
+Tasks: 272 total,   1 running, 271 sleeping,   0 stopped,   0 zombie
+%Cpu(s): 13.3 us,  5.9 sy,  0.5 ni, 76.8 id,  0.0 wa,  3.0 hi,  0.5 si,  0.0 st
+MiB Mem :   7921.8 total,    517.1 free,   5983.0 used,   3971.3 buff/cache
+MiB Swap:   4000.0 total,   3024.2 free,    975.8 used.   1938.9 avail Mem
+`
+
+func TestProcusTables(t *testing.T) {
+	got := collectFromString(t, sampleDpProc, "dp")
+	wantValues(t, got, map[string]float64{
+		"dp__procus__func__dfa_match_max_us":      114,
+		"dp__procus__func__dfa_match_avg_us":      1.1,
+		"dp__procus__func__dfa_match_ac_total_us": 811293,
+		"dp__procus__group__aho_result_max_us":    0,
+	})
+}
+
+func TestProcusdTables(t *testing.T) {
+	got := collectFromString(t, sampleDpProc, "dp")
+	wantValues(t, got, map[string]float64{
+		"dp__procusd__group__flow_fastpath_c10_avg_ticks": 1792,
+		"dp__procusd__group__flow_fastpath_c10_count":     1,
+		"dp__procusd__func__dfa_match_c9_avg_ticks":       929,
+		"dp__procusd__func__dfa_match_c9_total_us":        15,
+	})
+}
+
+func TestResourceUtil(t *testing.T) {
+	got := collectFromString(t, sampleDpProc, "dp")
+	if v := got["dp__ru__session_avg"]; len(v) != 15 {
+		t.Fatalf("session_avg = %d samples, want 15", len(v))
+	}
+	if v := got["dp__ru__pktbuf_avg"]; len(v) != 15 || v[0].Value != 3 {
+		t.Fatalf("pktbuf_avg = %+v", v)
+	}
+	if v := got["dp__ru__swtags_max"]; len(v) != 15 || v[0].Value != 6 {
+		t.Fatalf("swtags_max = %+v", v)
+	}
+	// newest-first: the "1" is column 5 -> 4 minutes before the block ts
+	blockTs, _ := time.Parse("2006-01-02 15:04:05", "2026-06-09 16:00:00")
+	smax := got["dp__ru__session_max"]
+	var hit bool
+	for _, s := range smax {
+		if s.Value == 1 && s.Ts.Equal(blockTs.Add(-4*time.Minute)) {
+			hit = true
+		}
+	}
+	if !hit {
+		t.Fatalf("session_max: expected value 1 at ts-4m; got %+v", smax)
+	}
+}
+
+func TestSessionInfo(t *testing.T) {
+	got := collectFromString(t, sampleDpProc, "dp")
+	wantValues(t, got, map[string]float64{
+		"dp__si__sessions_supported":            65536,
+		"dp__si__sessions_allocated":            21,
+		"dp__si__sessions_tcp":                  8,
+		"dp__si__associations_sctp":             0,
+		"dp__si__session_table_utelization_pct": 0,
+		"dp__si__sesscrsboot":                   68946,
+		"dp__si__pktrate":                       194,
+		"dp__si__throughput_kbps":               1271,
+		"dp__si__newconn":                       4,
+		"dp__si__timeout_tcp_default":           3600,
+		"dp__si__timeout_discard_tcp":           90,
+		"dp__si__timeout_discard_other_ip":      60,
+		"dp__si__accel_aging":                   1,
+		"dp__si__hw_offload":                    -1,
+		"dp__si__setup_icmp_unreachable_rate":   200,
+		"dp__si__pcap_token_bucket_rate":        10485760,
+	})
+}
+
+func TestTop(t *testing.T) {
+	got := collectFromString(t, sampleDpProc, "dp")
+	wantValues(t, got, map[string]float64{
+		"dp__top__load_avg_1":        0.84,
+		"dp__top__load_avg_5":        1.07,
+		"dp__top__load_avg_15":       1.19,
+		"dp__top__uptime_minutes":    902,
+		"dp__top__user_sess":         0,
+		"dp__top__tasks_total":       272,
+		"dp__top__tasks_running":     1,
+		"dp__top__tasks_zombie":      0,
+		"dp__top__cpu__user_pct":     13.3,
+		"dp__top__cpu__idle_pct":     76.8,
+		"dp__top__cpu__st_pct":       0,
+		"dp__top__mem_total":         7921.8,
+		"dp__top__mem_buffcache":     3971.3,
+		"dp__top__swap_used":         975.8,
+		"dp__top__avail_mem":         1938.9,
+	})
+}
+
+const sampleDpFinal = `2026-06-09 14:17:34.176 -0700  --- top
+top - 14:17:34 up 15:02,  0 users,  load average: 0.84, 1.07, 1.19
+Tasks: 272 total,   1 running, 271 sleeping,   0 stopped,   0 zombie
+%Cpu(s): 13.3 us,  5.9 sy,  0.5 ni, 76.8 id,  0.0 wa,  3.0 hi,  0.5 si,  0.0 st
+MiB Mem :   7921.8 total,    517.1 free,   5983.0 used,   3971.3 buff/cache
+MiB Swap:   4000.0 total,   3024.2 free,    975.8 used.   1938.9 avail Mem
+    PID USER      PR  NI    VIRT    RES    SHR S  %CPU  %MEM     TIME+ COMMAND
+   4276 root      20   0   66.4g   2.1g   2.1g S  28.8  27.4 266:21.10 pan_task
+   4281 root      20   0 2683036 264516  73184 S   3.8   3.3  29:19.24 wifclie+
+2026-06-09 14:11:38.375 -0700  --- processes
+Total num processes: 0
+Name                   PID      CPU%  FDs Open   Virt Mem     Res+Swap     State      Res+Swap-Lazy
+httpd                  15639    6     16         593768       29896        S          29896
+Totals                         6     133        211250024    6649272                 6649272
+2026-06-09 14:20:00.000 -0700  --- pow
+:pow parameters:
+:rcv_thresh       :1792
+:thread 2 rcv_tot 54087791 avg 0K/s
+:thread 2 rcv 4663457 avg 0K/s
+:thread 2 deq 55063979 avg 1K/s
+:thread 2 null 5196465189 avg 92K/s
+:thread 2 submit 1671779 avg 0K/s
+:thread 2 desubmit 49424334 avg 0K/s
+:thread 2 sel to 441960066 avg 8071/s
+:thread 2 sel ok 1678424 avg 1/s
+:thread 2 pow_wait 100 usec
+:io: wqe alloc 4663457 wqe null 0 fail ratio 0%
+:Total inflight wqe 0
+:used wqe 50 total wqe 25206 0% used
+`
+
+func approx(t *testing.T, got Series, name string, want float64) {
+	t.Helper()
+	v, ok := got[name]
+	if !ok {
+		t.Errorf("missing %s", name)
+		return
+	}
+	d := v[0].Value - want
+	if d < 0 {
+		d = -d
+	}
+	if d > 1 {
+		t.Errorf("%s = %v, want ~%v", name, v[0].Value, want)
+	}
+}
+
+func TestTopProcess(t *testing.T) {
+	got := collectFromString(t, sampleDpFinal, "dp")
+	wantValues(t, got, map[string]float64{
+		"dp__topprocess__pan_task_4276__cpu":     28.8,
+		"dp__topprocess__pan_task_4276__mem_pct": 27.4,
+		"dp__topprocess__pan_task_4276__nice":    0,
+		"dp__topprocess__wifclie_4281__cpu":      3.8,
+	})
+	approx(t, got, "dp__topprocess__pan_task_4276__virt_mem", 66.4*1073741824)
+	approx(t, got, "dp__topprocess__pan_task_4276__res_mem", 2.1*1073741824)
+	approx(t, got, "dp__topprocess__pan_task_4276__time", 15981.1)
+	approx(t, got, "dp__topprocess__wifclie_4281__virt_mem", 2683036*1024)
+	approx(t, got, "dp__topprocess__wifclie_4281__res_mem", 264516*1024)
+}
+
+func TestProcessesTotals(t *testing.T) {
+	got := collectFromString(t, sampleDpFinal, "dp")
+	wantValues(t, got, map[string]float64{
+		"dp__total__processes":         0,
+		"dp__total__cpu_pct":           6,
+		"dp__total__fds":               133,
+		"dp__total__virt_mem":          211250024,
+		"dp__total__res_mem":           6649272,
+		"dp__total__res_mem_sub_lazy":  6649272,
+		// keep-both: per-process counters still emitted
+		"dp__processes__httpd_15639_cpu": 6,
+	})
+}
+
+const sampleMemDetail = `2026-06-09 17:00:00.000 -0700  --- memory_detail
+MemTotal:        8111956 kB
+MemFree:          429592 kB
+MemAvailable:    1881560 kB
+Buffers:           12345 kB
+Cached:          2345678 kB
+Slab:             512000 kB
+SReclaimable:     112000 kB
+SUnreclaim:       400000 kB
+KernelStack:       16384 kB
+PageTables:        45000 kB
+Committed_AS:    9876543 kB
+HugePages_Total:       0
+2026-06-09 17:05:00.000 -0700  --- slabinfo
+slabinfo - version: 2.1
+# name            <active_objs> <num_objs> <objsize> <objperslab> <pagesperslab> : tunables <limit> <batchcount> <sharedfactor> : slabdata <active_slabs> <num_slabs> <sharedavail>
+kmalloc-96         81920  82530     96   42    1 : tunables    0    0    0 : slabdata   1965   1965      0
+kmalloc-1k          2048   2048   1024   32    8 : tunables    0    0    0 : slabdata     64     64      0
+dentry            145530 145530    192   21    1 : tunables    0    0    0 : slabdata   6930   6930      0
+`
+
+func TestMemoryDetail(t *testing.T) {
+	got := collectFromString(t, sampleMemDetail, "mp")
+	wantValues(t, got, map[string]float64{
+		"mp__memorydetail__memtotal":     8111956,
+		"mp__memorydetail__memfree":      429592,
+		"mp__memorydetail__memavailable": 1881560,
+		"mp__memorydetail__slab":         512000,
+		"mp__memorydetail__sreclaimable": 112000,
+		"mp__memorydetail__sunreclaim":   400000,
+		"mp__memorydetail__committed_as": 9876543,
+		// no "kB" suffix on this one; must still parse
+		"mp__memorydetail__hugepages_total": 0,
+	})
+}
+
+func TestSlabinfo(t *testing.T) {
+	got := collectFromString(t, sampleMemDetail, "mp")
+	wantValues(t, got, map[string]float64{
+		"mp__slabinfo__kmalloc_96_activeobjs": 81920,
+		"mp__slabinfo__kmalloc_96_numobjs":    82530,
+		"mp__slabinfo__kmalloc_96_objsize":    96,
+		// derived: active_objs * objsize, so cache growth reads in bytes
+		"mp__slabinfo__kmalloc_96_totalactsize": 81920 * 96,
+		"mp__slabinfo__kmalloc_1k_totalactsize": 2048 * 1024,
+		"mp__slabinfo__dentry_totalactsize":     145530 * 192,
+	})
+	// the header/comment lines must not become counters
+	for name := range got {
+		if strings.Contains(name, "slabinfo__name") || strings.Contains(name, "slabinfo__version") {
+			t.Errorf("header line parsed as a slab cache: %s", name)
+		}
+	}
+}
+
+func TestVmpow(t *testing.T) {
+	got := collectFromString(t, sampleDpFinal, "dp")
+	wantValues(t, got, map[string]float64{
+		"dp__vmpow__thread02__rcv_tot":      54087791,
+		"dp__vmpow__thread02__deq":          55063979,
+		"dp__vmpow__thread02__null":         5196465189,
+		"dp__vmpow__thread02__submit":       1671779,
+		"dp__vmpow__thread02__desubmit":     49424334,
+		"dp__vmpow__thread02__sel_to":       441960066,
+		"dp__vmpow__thread02__sel_ok":       1678424,
+		"dp__vmpow__thread02__pow_wait":     100,
+		"dp__vmpow__thread02__io_wqe_alloc": 4663457,
+		"dp__vmpow__thread02__io_wqe_null":  0,
+		"dp__vmpow__total_inflight_wqe":     0,
+		"dp__vmpow__used_wqe":               50,
+		"dp__vmpow__used_wqe_total":         25206,
+		"dp__vmpow__used_wqe_pct":           0,
+		"dp__vmpow__rcv_thresh":             1792,
+	})
+}
+
+// cpuBlock builds a "--- cpu" block with the given Load Avg row.
+func cpuBlock(loadAvg string) string {
+	return "2026-06-09 11:29:44.537 -0700  --- cpu\n" +
+		"Last 180 seconds\n" +
+		"Avg (%)    Max (%)\n" +
+		"17         24\n" +
+		"Load Avg:\n" + loadAvg + "\n"
+}
+
+// The Load Avg row is /proc/loadavg in full:
+//
+//	2.32 1.59 1.45 6/1462 319676
+//
+// The three averages were being read and the last two fields dropped. The
+// trailing number is the last PID the kernel assigned, so the difference
+// between two samples is the number of processes created in that interval — in
+// the sample archive that runs 834 to 10,283 between consecutive samples, which
+// is what distinguishes a steady box from one in a respawn loop.
+func TestLoadAvgKeepsThreadCountsAndLastPID(t *testing.T) {
+	got := collectFromString(t, cpuBlock("2.32 1.59 1.45 6/1462 319676"), "mp")
+	for name, want := range map[string]float64{
+		"mp__cpu_load_avg__l_1":          2.32,
+		"mp__cpu_load_avg__l_5":          1.59,
+		"mp__cpu_load_avg__l_15":         1.45,
+		"mp__cpu_load_avg__run_thread":   6,
+		"mp__cpu_load_avg__total_thread": 1462,
+		"mp__cpu_load_avg__last_pid":     319676,
+	} {
+		ss, ok := got[name]
+		if !ok {
+			t.Errorf("missing %s", name)
+			continue
+		}
+		if ss[0].Value != want {
+			t.Errorf("%s = %v, want %v", name, ss[0].Value, want)
+		}
+	}
+}
+
+// A row without the trailing fields must still yield the three averages rather
+// than failing to match at all.
+func TestLoadAvgWithoutThreadFields(t *testing.T) {
+	got := collectFromString(t, cpuBlock("0.10 0.20 0.30"), "dp")
+	if _, ok := got["dp__cpu_load_avg__l_1"]; !ok {
+		t.Fatal("the three averages must still be read from a short row")
+	}
+	if _, ok := got["dp__cpu_load_avg__last_pid"]; ok {
+		t.Error("no PID field was present, so none should be emitted")
+	}
+}
+
+// The load-average anomaly rule used to enumerate (mp|dp). A high-end chassis
+// adds a control plane and one dataplane per slot, so it has to match those
+// too or their CPU pressure would never raise an anomaly.
+func TestLoadAvgAnomalyRuleCoversHighEndPlanes(t *testing.T) {
+	for _, name := range []string{
+		"mp__cpu_load_avg__l_1", "dp__cpu_load_avg__l_5",
+		"cp__cpu_load_avg__l_15", "dp0__cpu_load_avg__l_1", "dp1__cpu_load_avg__l_5",
+	} {
+		if !loadAvgAnomRe.MatchString(name) {
+			t.Errorf("%s should be eligible for the load-average anomaly rule", name)
+		}
+	}
+	for _, name := range []string{
+		"mp__cpu_load_avg__l_2", "mp__cpu__last_3m_avg_pct", "xp__cpu_load_avg__l_1",
+	} {
+		if loadAvgAnomRe.MatchString(name) {
+			t.Errorf("%s should not match the load-average rule", name)
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// High-end chassis: control plane and multiple dataplanes
+// ---------------------------------------------------------------------------
+
+// Every dataplane on a multi-dataplane chassis names its log "dp-monitor.log";
+// what distinguishes them is the per-plane root under /opt. Keying on the
+// filename merged dp0 and dp1 into a single "dp" series — interleaving samples
+// from two different dataplanes — and missed cp-monitor.log entirely.
+func TestPlaneOfPrefersTheDirectory(t *testing.T) {
+	cases := map[string]string{
+		"var/log/pan/mp-monitor.log":         "mp",
+		"var/log/pan/dp-monitor.log":         "dp",
+		"var/log/pan/mp-monitor.log.4":       "mp",
+		"opt/var.cp/log/pan/cp-monitor.log":  "cp",
+		"opt/var.dp0/log/pan/dp-monitor.log": "dp0",
+		"opt/var.dp1/log/pan/dp-monitor.log": "dp1",
+		"opt/var.dp2/log/pan/dp-monitor.log": "dp2",
+		// slotted chassis: the slot has to be part of the name, or two slots'
+		// counters merge exactly as dp0 and dp1 did
+		"opt/var/s1/cp/log/pan/cp-monitor.log":   "s1cp",
+		"opt/var/s1/dp0/log/pan/dp-monitor.log":  "s1dp0",
+		"opt/var/s1/dp1/log/pan/dp-monitor.log":  "s1dp1",
+		"opt/var/s2/dp0/log/pan/dp-monitor.log":  "s2dp0",
+		"opt/var/s4/cp/log/pan/cp-monitor.log.3": "s4cp",
+	}
+	for path, want := range cases {
+		m := monitorFileRe.FindStringSubmatch(path)
+		if m == nil {
+			t.Errorf("%s matched no monitor log", path)
+			continue
+		}
+		if got := planeOf(path, m[1]); got != want {
+			t.Errorf("%s -> %q, want %q", path, got, want)
+		}
+	}
+}
+
+// The low-end layout must keep working. An earlier attempt at a single
+// combined pattern needed two "(?:^|/)" in sequence, which requires a doubled
+// slash, so it matched no /var/log/pan path at all and would have dropped
+// every existing mp and dp counter.
+func TestSingleDataplaneLayoutStillMatches(t *testing.T) {
+	for _, p := range []string{"var/log/pan/mp-monitor.log", "var/log/pan/dp-monitor.log.3"} {
+		if monitorFileRe.FindStringSubmatch(p) == nil {
+			t.Errorf("%s no longer matches; all existing counters would vanish", p)
+		}
+	}
+	for _, p := range []string{
+		"var/log/pan/wildfire-monitor.log",
+		"opt/var.dp0/log/pan/pan_task_12.log",
+	} {
+		if monitorFileRe.FindStringSubmatch(p) != nil {
+			t.Errorf("%s should not be treated as a plane monitor log", p)
+		}
+	}
+}
+
+// The control plane reports Max CPU as a full-precision float while the
+// dataplane reports integers, so an integer-only pattern silently dropped
+// every control-plane CPU sample — all 40 of them in the PA-5250 archive,
+// hiding a control plane sitting at 89%.
+func TestCpuAcceptsFractionalMax(t *testing.T) {
+	got := collectFromString(t, "2026-08-17 10:09:48.231 -0700  --- cpu\n"+
+		"Last 180 seconds\nAvg (%)    Max (%)\n89         90.332360570687413\n", "cp")
+	if ss, ok := got["cp__cpu__last_3m_avg_pct"]; !ok || ss[0].Value != 89 {
+		t.Errorf("avg = %v, want 89", got["cp__cpu__last_3m_avg_pct"])
+	}
+	ss, ok := got["cp__cpu__last_3m_max_pct"]
+	if !ok {
+		t.Fatal("a fractional Max was dropped entirely")
+	}
+	if ss[0].Value < 90.33 || ss[0].Value > 90.34 {
+		t.Errorf("max = %v, want ~90.3324", ss[0].Value)
+	}
+}
+
+const sampleCpStats = `2026-08-17 10:08:37.491 -0700  --- cp_stats
+sw.mprelay.s1.cp.platform: { 
+  netmsg: { 
+    errors: { 
+      acl_delete: 0, 
+      arp_update: 3, 
+    }, 
+    stats: { 
+      acl_delete: 0, 
+      arp_delete: 26, 
+      arp_update: 99774, 
+    }, 
+  }, 
+  stats: { 
+    arp_update_fail: 7, 
+    mac_delete_fail: 0, 
+  }, 
+}
+`
+
+// The nesting decides the name, and the outermost platform object is dropped.
+func TestCpStatsNestedNames(t *testing.T) {
+	got := collectFromString(t, sampleCpStats, "cp")
+	want := map[string]float64{
+		"cp__cpstats__netmsg_errors_acl_delete": 0,
+		"cp__cpstats__netmsg_errors_arp_update": 3,
+		"cp__cpstats__netmsg_stats_acl_delete":  0,
+		"cp__cpstats__netmsg_stats_arp_delete":  26,
+		"cp__cpstats__netmsg_stats_arp_update":  99774,
+		"cp__cpstats__stats_arp_update_fail":    7,
+		"cp__cpstats__stats_mac_delete_fail":    0,
+	}
+	for name, v := range want {
+		ss, ok := got[name]
+		if !ok {
+			t.Errorf("missing %s", name)
+			continue
+		}
+		if ss[0].Value != v {
+			t.Errorf("%s = %v, want %v", name, ss[0].Value, v)
+		}
+	}
+	// "stats" appears twice at different depths; they must not collide
+	if len(got["cp__cpstats__netmsg_stats_acl_delete"]) == 0 ||
+		len(got["cp__cpstats__stats_arp_update_fail"]) == 0 {
+		t.Error("the two stats objects must stay distinct")
+	}
+	// the platform root must not leak into any name
+	for name := range got {
+		if strings.Contains(name, "mprelay") || strings.Contains(name, "platform") {
+			t.Errorf("the platform root leaked into %q", name)
+		}
+	}
+}
+
+// Braces must not leave the stack unbalanced across blocks, or the next
+// block's names would inherit stale path segments.
+func TestCpStatsStackResetsBetweenBlocks(t *testing.T) {
+	got := collectFromString(t, sampleCpStats+sampleCpStats, "cp")
+	ss := got["cp__cpstats__netmsg_stats_arp_update"]
+	if len(ss) != 2 {
+		t.Fatalf("got %d samples across two blocks, want 2", len(ss))
+	}
+	for name := range got {
+		if strings.Count(name, "netmsg") > 1 {
+			t.Errorf("stale nesting leaked into %q", name)
+		}
+	}
+}
+
+// Below a PA-7000 the block exists but carries no counters. That is the
+// platform, not a parse failure.
+func TestFabricTrafficStatsUnsupportedIsNotAFailure(t *testing.T) {
+	got := collectFromString(t,
+		"2026-08-17 10:09:54.171 -0700  --- fabric_traffic_stats\n"+
+			"Fabric Traffic stats collection not supported in 5200 cp PA-5250\n", "cp")
+	for name := range got {
+		if strings.Contains(name, "fabric") {
+			t.Errorf("no fabric counters should be emitted, got %q", name)
+		}
+	}
+}
