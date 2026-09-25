@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 // aliased so it doesn't shadow the DOM MouseEvent the dygraphs interaction
 // models are typed against
 import type { MouseEvent as ReactMouseEvent } from "react";
@@ -119,11 +119,11 @@ function logStateFor(fileId: string): LogFilesState {
    what a newly opened file selects. It was previously a sub-tab of Graphs,
    which buried the one view that answers "what is wrong with this box". */
 const FIREWALL_TABS: { id: Tab; label: string }[] = [
-  { id: "anomalies", label: "Anomalies" },
-  { id: "system", label: "System Info" },
-  { id: "logs", label: "Log Files" },
-  { id: "graphs", label: "Graphs" },
-  { id: "appstats", label: "App Stats" },
+  { id: "anomalies", label: "Insights" },
+  { id: "system", label: "Overview" },
+  { id: "logs", label: "Logs" },
+  { id: "graphs", label: "Metrics" },
+  { id: "appstats", label: "Apps" },
   { id: "licenses", label: "Licenses" },
   { id: "config", label: "Config" },
 ];
@@ -131,14 +131,44 @@ const FIREWALL_TABS: { id: Tab; label: string }[] = [
 const GP_TABS: { id: Tab; label: string }[] = [
   { id: "gp-overview", label: "Overview" },
   { id: "gp-connection", label: "Connection" },
-  { id: "gp-auth", label: "Authentication" },
-  { id: "gp-hip", label: "HIP & Network" },
-  { id: "logs", label: "Log Files" },
-  { id: "gp-anomalies", label: "Anomalies" },
+  { id: "gp-auth", label: "Identity" },
+  { id: "gp-hip", label: "HIP" },
+  { id: "logs", label: "Logs" },
+  { id: "gp-anomalies", label: "Insights" },
 ];
 
 function tabsFor(kind: ArchiveKind | undefined): { id: Tab; label: string }[] {
   return kind === "gp-agent" ? GP_TABS : FIREWALL_TABS;
+}
+
+/** Brand lockup: mark + “analyser” (no product title text). */
+function BrandLockup({ compact = false }: { compact?: boolean }) {
+  return (
+    <a className={"brand-lockup" + (compact ? " brand-lockup-compact" : "")} href="/" aria-label="Analyser home">
+      <img className="brand-mark" src="/pan-mark.svg" alt="" width={compact ? 28 : 40} height={compact ? 28 : 40} />
+      <span className="brand-word">analyser</span>
+    </a>
+  );
+}
+
+function AppTopBar({
+  children,
+  trailing,
+}: {
+  children?: ReactNode;
+  trailing?: ReactNode;
+}) {
+  return (
+    <header className="topbar">
+      <div className="topbar-inner">
+        <BrandLockup compact />
+        <nav className="topbar-nav" aria-label="Primary">
+          {children}
+        </nav>
+        {trailing ? <div className="topbar-trailing">{trailing}</div> : null}
+      </div>
+    </header>
+  );
 }
 
 export default function App() {
@@ -214,18 +244,30 @@ function FilesPage() {
           <div className="progress-fill" style={{ width: `${progress}%` }} />
         </div>
       )}
+      <AppTopBar
+        trailing={
+          <label className="upload topbar-upload">
+            {progress !== null ? `Uploading… ${progress}%` : "Upload"}
+            <input
+              type="file"
+              accept=".tgz,.tar.gz,.zip"
+              hidden
+              disabled={progress !== null}
+              onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])}
+            />
+          </label>
+        }
+      >
+        <a className="topbar-link active" href="/">Library</a>
+      </AppTopBar>
       <main className="content landing">
         <section className="landing-hero" aria-label="Introduction">
-          <div className="shield-row shield-row-product" aria-label="Product badges">
-            {PRODUCT_SHIELDS.map((s) => (
-              <img key={s.alt} className="shield" src={s.src} alt={s.alt} height={28} />
-            ))}
+          <div className="landing-brand-hero">
+            <BrandLockup />
           </div>
-          <p className="landing-eyebrow">Palo Alto Networks · Tech Support</p>
-          <h1 className="brand">PAN TechSupport Analyzer</h1>
           <p className="landing-lead">
-            Upload a firewall tech-support archive or GlobalProtect agent log
-            collection, then search, graph, and diagnose without unpacking by hand.
+            Diagnose firewall tech-support archives and GlobalProtect collections
+            with search, metrics, and guided insights — quietly, precisely.
           </p>
           <div className="capability-tags" aria-label="Capabilities">
             {CAPABILITY_TAGS.map((t, i) => (
@@ -234,29 +276,6 @@ function FilesPage() {
               </span>
             ))}
           </div>
-        </section>
-
-        <section className="arch-section" aria-label="Architecture">
-          <h2 className="section-label">Architecture</h2>
-          <div className="arch-diagram" role="img" aria-label="Browser to Nginx to Go API, with TimescaleDB, Redis, MinIO, and Worker">
-            <div className="arch-flow">
-              <div className="arch-node arch-browser">Browser</div>
-              <span className="arch-arrow" aria-hidden="true">→</span>
-              <div className="arch-node arch-fe">Nginx · React</div>
-              <span className="arch-arrow" aria-hidden="true">→</span>
-              <div className="arch-node arch-api">API · Go</div>
-              <span className="arch-arrow" aria-hidden="true">→</span>
-              <div className="arch-node arch-worker">Worker · Go</div>
-            </div>
-            <div className="arch-data">
-              <div className="arch-node arch-db">TimescaleDB</div>
-              <div className="arch-node arch-redis">Redis</div>
-              <div className="arch-node arch-minio">MinIO</div>
-            </div>
-          </div>
-          <p className="arch-caption muted">
-            Target Compose layout — UI talks to the Go API; Redis feeds the worker; TimescaleDB and MinIO hold parsed data and raw archives.
-          </p>
         </section>
 
         <section className="feature-tiles" aria-label="What you can do">
@@ -269,43 +288,21 @@ function FilesPage() {
           ))}
         </section>
 
-        <section className="tech-section" aria-label="Technology stack">
-          <h2 className="section-label">Built with</h2>
-          <div className="shield-row shield-row-tech">
-            {TECH_SHIELDS.map((s, i) => (
-              <img
-                key={s.alt}
-                className="shield"
-                src={s.src}
-                alt={s.alt}
-                height={28}
-                style={{ ["--i" as string]: i }}
-              />
-            ))}
-          </div>
-        </section>
-
         <section className="files-section">
-        <h2>My Files</h2>
-        <label className="upload">
-          {progress !== null ? `Uploading… ${progress}%` : "Upload .tgz / .zip"}
-          <input
-            type="file"
-            accept=".tgz,.tar.gz,.zip"
-            hidden
-            disabled={progress !== null}
-            onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])}
-          />
-        </label>
+        <div className="section-head">
+          <h2>Library</h2>
+          <p className="section-sub">Your uploaded archives</p>
+        </div>
         {error && <p className="error">{error}</p>}
+        <div className="table-card">
         <table>
           <thead>
             <tr>
-              <th>Filename</th>
-              <th>Type</th>
+              <th>Name</th>
+              <th>Kind</th>
               <th>Size</th>
               <th>Status</th>
-              <th>Uploaded</th>
+              <th>Added</th>
               <th></th>
             </tr>
           </thead>
@@ -339,76 +336,68 @@ function FilesPage() {
                 </td>
                 <td>{new Date(f.uploaded_at).toLocaleString()}</td>
                 <td>
-                  <button onClick={() => del(f.id)}>Delete</button>
+                  <button className="btn-ghost" onClick={() => del(f.id)}>Remove</button>
                 </td>
               </tr>
             ))}
             {files.length === 0 && (
               <tr>
-                <td colSpan={6}>No files uploaded yet — drop a tech-support or GP log archive above.</td>
+                <td colSpan={6}>No archives yet. Upload a tech-support or GP log bundle to begin.</td>
               </tr>
             )}
           </tbody>
         </table>
+        </div>
         </section>
       </main>
     </div>
   );
 }
 
-const PRODUCT_SHIELDS = [
-  {
-    alt: "Palo Alto Tech Support",
-    src: "https://img.shields.io/badge/Palo%20Alto-Tech%20Support-FA582D?style=for-the-badge",
-  },
-  {
-    alt: "PAN-OS Firewall TS",
-    src: "https://img.shields.io/badge/PAN--OS-Firewall%20TS-00ADEF?style=for-the-badge",
-  },
-  {
-    alt: "GlobalProtect Agent Logs",
-    src: "https://img.shields.io/badge/GlobalProtect-Agent%20Logs-7B2D8E?style=for-the-badge",
-  },
-];
-
-const TECH_SHIELDS = [
-  { alt: "Go", src: "https://img.shields.io/badge/Go-00ADD8?style=for-the-badge&logo=go&logoColor=white" },
-  { alt: "React", src: "https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB" },
-  { alt: "TypeScript", src: "https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white" },
-  { alt: "Vite", src: "https://img.shields.io/badge/Vite-646CFF?style=for-the-badge&logo=vite&logoColor=white" },
-  { alt: "TimescaleDB", src: "https://img.shields.io/badge/TimescaleDB-FDB515?style=for-the-badge&logo=postgresql&logoColor=black" },
-  { alt: "Redis", src: "https://img.shields.io/badge/Redis-DC382D?style=for-the-badge&logo=redis&logoColor=white" },
-  { alt: "MinIO", src: "https://img.shields.io/badge/MinIO-C72E49?style=for-the-badge&logo=minio&logoColor=white" },
-  { alt: "Docker", src: "https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white" },
-  { alt: "Nginx", src: "https://img.shields.io/badge/Nginx-009639?style=for-the-badge&logo=nginx&logoColor=white" },
-];
-
 const CAPABILITY_TAGS = [
-  "Firewall TS",
+  "Firewall",
   "GlobalProtect",
-  "Boolean Search",
-  "Counter Graphs",
-  "Config Browser",
-  "Anomalies",
-  "OOM Analysis",
-  "HIP Reports",
+  "Search",
+  "Metrics",
+  "Config",
+  "Insights",
+  "Memory",
+  "HIP",
 ];
 
 const FEATURE_TILES = [
   {
-    icon: "↑",
-    title: "Upload & detect",
-    body: "Drop a .tgz or .zip. The app detects firewall vs GlobalProtect agent and opens the right tabs.",
+    icon: (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M12 3v12" strokeLinecap="round" />
+        <path d="M7 10l5 5 5-5" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M5 19h14" strokeLinecap="round" />
+      </svg>
+    ),
+    title: "Ingest",
+    body: "Drop a .tgz or .zip. Kind is detected automatically and the right workspace opens.",
   },
   {
-    icon: "⌕",
-    title: "Search like grep",
-    body: "AND / OR / NOT, phrases, -A/-B context, and awk-style field filters across the whole archive.",
+    icon: (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="11" cy="11" r="6.5" />
+        <path d="M16.5 16.5L21 21" strokeLinecap="round" />
+      </svg>
+    ),
+    title: "Search",
+    body: "Boolean queries, phrases, context lines, and field filters across the whole archive.",
   },
   {
-    icon: "◈",
-    title: "Graph & diagnose",
-    body: "Plot counters, spot anomalies and OOM events, and walk GlobalProtect connection stages.",
+    icon: (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M4 19V9" strokeLinecap="round" />
+        <path d="M10 19V5" strokeLinecap="round" />
+        <path d="M16 19v-7" strokeLinecap="round" />
+        <path d="M20 19V8" strokeLinecap="round" />
+      </svg>
+    ),
+    title: "Diagnose",
+    body: "Metrics, insights, OOM signals, and GlobalProtect connection stages — in one place.",
   },
 ];
 
@@ -824,7 +813,7 @@ function GpAnomaliesTab({ fileId, portal, setPortal, onOpenLine }: GpTabProps) {
 
   return (
     <div className="gp-anomalies">
-      <h2>Anomalies</h2>
+      <h2>Insights</h2>
       <GpPortalPicker portals={data.portals} portal={portal} setPortal={setPortal} />
       {(sig?.groups?.length ?? 0) > 0 && (
         <SignatureFindings sig={sig} err={null} onOpenLine={onOpenLine ?? (() => {})} />
@@ -1055,7 +1044,7 @@ function GpAuthTab({ fileId, portal, setPortal }: GpTabProps) {
 
   return (
     <div className="gp-auth">
-      <h2>Authentication</h2>
+      <h2>Identity</h2>
       <GpPortalPicker portals={data.portals} portal={portal} setPortal={setPortal} />
       <div className="gp-verdict">
         <strong>{all.length} authentication{all.length === 1 ? "" : "s"}</strong>
@@ -2034,7 +2023,7 @@ function StatusIcon({ status, error }: { status: string; error?: string }) {
   return <span title={status}>•</span>;
 }
 
-/* ---------- per-file view: sidebar tabs ---------- */
+/* ---------- per-file view: top navigation ---------- */
 
 /* A fixed identity strip above every tab.
 
@@ -2118,7 +2107,6 @@ function FileView({ id }: { id: string }) {
   const [file, setFile] = useState<TsFile | null>(null);
   const [tab, setTab] = useState<Tab | null>(null);
   const [missing, setMissing] = useState(false);
-  const [collapsed, setCollapsed] = useState(false);
   // Which portal the GlobalProtect tabs are scoped to. It lives here rather
   // than inside a tab so the choice survives moving between them: a collection
   // can hold several portals, and mixing their gateways, logins and events
@@ -2153,10 +2141,13 @@ function FileView({ id }: { id: string }) {
   if (missing) {
     return (
       <div className="page">
+        <AppTopBar>
+          <a className="topbar-link" href="/">Library</a>
+        </AppTopBar>
         <main className="content">
           <h2>File not found</h2>
           <p>
-            <a className="file-link" href="/">← Back to My Files</a>
+            <a className="file-link" href="/">← Back to Library</a>
           </p>
         </main>
       </div>
@@ -2164,40 +2155,32 @@ function FileView({ id }: { id: string }) {
   }
 
   return (
-    <div className="layout">
-      <aside className={"sidebar" + (collapsed ? " sidebar-collapsed" : "")}>
-        <button
-          className="collapse-btn"
-          onClick={() => setCollapsed(!collapsed)}
-          title={collapsed ? "Expand navigation" : "Collapse navigation"}
-        >
-          {collapsed ? "»" : "«"}
-        </button>
-        {!collapsed && <h1>PAN-TS</h1>}
-        <a className="back-link" href="/" title="Back to My Files">
-          {collapsed ? "←" : "← My Files"}
-        </a>
-        {!collapsed && (
-          <div className="sidebar-file" title={file?.filename}>
-            {file?.filename ?? "…"}
+    <div className="page shell-top">
+      <AppTopBar
+        trailing={
+          <div className="topbar-file-meta" title={file?.filename}>
             {file?.kind && (
               <span className={"kind-badge kind-" + file.kind} title={kindTitle(file)}>
                 {KIND_LABEL[file.kind]}
               </span>
             )}
+            <span className="topbar-filename">{file?.filename ?? "…"}</span>
           </div>
-        )}
+        }
+      >
+        <a className="topbar-link" href="/" title="Back to Library">Library</a>
+        <span className="topbar-sep" aria-hidden="true" />
         {tabs.map((t) => (
           <button
             key={t.id}
-            className={tab === t.id ? "active" : ""}
+            type="button"
+            className={"topbar-link" + (tab === t.id ? " active" : "")}
             onClick={() => setTab(t.id)}
-            title={t.label}
           >
-            {collapsed ? t.label[0] : t.label}
+            {t.label}
           </button>
         ))}
-      </aside>
+      </AppTopBar>
       <main className="content">
         {file?.kind !== "gp-agent" && <DeviceBanner fileId={id} />}
         {tab === "system" && <SystemInfo fileId={id} />}
@@ -2599,7 +2582,7 @@ function AnomaliesTab({
 
   return (
     <section>
-      <h2>Anomalies</h2>
+      <h2>Insights</h2>
       <div className="cfg-subtabs graphs-subtabs">
         <button className={view === "findings" ? "active" : ""} onClick={() => setView("findings")}>
           Findings
@@ -2782,7 +2765,7 @@ function Graphs({ fileId }: { fileId: string }) {
 
   return (
     <section>
-      <h2>Graphs</h2>
+      <h2>Metrics</h2>
       <div style={pane("counters")}>
         <CounterGraphs fileId={fileId} visible={true} />
       </div>
@@ -4725,7 +4708,7 @@ const NETWORK_SECTIONS: SectionDef[] = [
   { label: "Portals", tag: "portal", parentTag: "global-protect", group: "GlobalProtect" },
   { label: "Gateways", tag: "gateway", parentTag: "global-protect", group: "GlobalProtect" },
   { label: "MDM", tag: "mdm", parentTag: "global-protect", group: "GlobalProtect" },
-  { label: "Clientless Apps", tag: "clientless-app", parentTag: "global-protect", group: "GlobalProtect" },
+  { label: "Clientless App Stats", tag: "clientless-app", parentTag: "global-protect", group: "GlobalProtect" },
   { label: "Clientless App Groups", tag: "clientless-app-group", parentTag: "global-protect", group: "GlobalProtect" },
   { label: "DHCP Profile", tag: "dhcp-profile", parentTag: "global-protect", group: "GlobalProtect" },
   { label: "QoS", tag: "qos", parentTag: "network" },
@@ -5603,7 +5586,7 @@ function LogFiles({ fileId }: { fileId: string }) {
 
   return (
     <section>
-      <h2>Log Files</h2>
+      <h2>Logs</h2>
       <ArchiveSearch
         fileId={fileId}
         onOpen={openFromSearch}
@@ -6693,10 +6676,13 @@ function LogViewerPage({ fileId }: { fileId: string }) {
   if (paths.length === 0) {
     return (
       <div className="page">
+        <AppTopBar>
+          <a className="topbar-link" href={`/files/${fileId}`}>Workspace</a>
+        </AppTopBar>
         <main className="content">
           <h2>No files selected.</h2>
           <p>
-            <a className="file-link" href={`/files/${fileId}`}>← Back to file</a>
+            <a className="file-link" href={`/files/${fileId}`}>← Back to workspace</a>
           </p>
         </main>
       </div>
@@ -6717,17 +6703,23 @@ function LogViewerPage({ fileId }: { fileId: string }) {
 
   return (
     <div className="page">
-      <main className="content">
-        <h1 className="brand">Log Viewer</h1>
-        <p>
-          <a className="file-link" href={`/files/${fileId}`}>← Back to file</a>
-          <button className="link-btn" onClick={() => setMaximized(true)}>
-            Maximize
+      <AppTopBar
+        trailing={
+          <button className="topbar-link" type="button" onClick={() => setMaximized(true)}>
+            Expand
           </button>
-          {(from || to) && (
-            <span className="muted"> — filtered {from && `from ${from.replace("T", " ")}`} {to && `to ${to.replace("T", " ")}`}</span>
-          )}
-        </p>
+        }
+      >
+        <a className="topbar-link" href={`/files/${fileId}`}>Workspace</a>
+        <span className="topbar-sep" aria-hidden="true" />
+        <span className="topbar-link active">Logs</span>
+      </AppTopBar>
+      <main className="content">
+        {(from || to) && (
+          <p className="muted" style={{ paddingLeft: 0, marginBottom: 12 }}>
+            Filtered {from && `from ${from.replace("T", " ")}`} {to && `to ${to.replace("T", " ")}`}
+          </p>
+        )}
         {items.map((it) => (
           <LogContent key={it.path} fileId={fileId} path={it.path} from={from} to={to} />
         ))}
@@ -6749,7 +6741,7 @@ function SystemInfo({ fileId }: { fileId: string }) {
 
   return (
     <section>
-      <h2>System Info</h2>
+      <h2>Overview</h2>
       {err && <p className="error">{err}</p>}
       {info && (
         <div className="kv-grid">
@@ -6868,12 +6860,12 @@ function AppStatsTab({ fileId }: { fileId: string }) {
     else { setSortKey(k); setAsc(false); }
   };
 
-  if (err) return <section><h2>App Stats</h2><p className="error">{err}</p></section>;
-  if (!doc) return <section><h2>App Stats</h2><p className="muted">Loading…</p></section>;
+  if (err) return <section><h2>Apps</h2><p className="error">{err}</p></section>;
+  if (!doc) return <section><h2>Apps</h2><p className="muted">Loading…</p></section>;
 
   return (
     <section>
-      <h2>App Stats</h2>
+      <h2>Apps</h2>
       <div className="cfg-source">
         <span className="cfg-source-path">{doc.source || "—"}</span>
         {doc.source === "panio_infreq" && (
