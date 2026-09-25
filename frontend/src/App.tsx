@@ -214,14 +214,57 @@ function FilesPage() {
           <div className="progress-fill" style={{ width: `${progress}%` }} />
         </div>
       )}
-      <main className="content">
-        <h1 className="brand">PAN TechSupport Analyzer</h1>
+      <main className="content landing">
+        <section className="landing-hero" aria-label="Introduction">
+          <p className="landing-eyebrow">Palo Alto Networks · Tech Support</p>
+          <h1 className="brand">PAN TechSupport Analyzer</h1>
+          <p className="landing-lead">
+            Upload a firewall tech-support archive or GlobalProtect agent log
+            collection, then search, graph, and diagnose without unpacking by hand.
+          </p>
+          <div className="capability-tags" aria-label="Capabilities">
+            {CAPABILITY_TAGS.map((t, i) => (
+              <span key={t} className="cap-tag" style={{ ["--i" as string]: i }}>
+                {t}
+              </span>
+            ))}
+          </div>
+        </section>
+
+        <section className="feature-tiles" aria-label="What you can do">
+          {FEATURE_TILES.map((f, i) => (
+            <article key={f.title} className="feature-tile" style={{ ["--i" as string]: i }}>
+              <span className="feature-icon" aria-hidden="true">{f.icon}</span>
+              <h3>{f.title}</h3>
+              <p>{f.body}</p>
+            </article>
+          ))}
+        </section>
+
+        <section className="tech-section" aria-label="Technology stack">
+          <h2 className="section-label">Built with</h2>
+          <div className="tech-grid">
+            {TECH_TILES.map((t, i) => (
+              <div key={t.name} className="tech-tile" style={{ ["--i" as string]: i }} title={t.blurb}>
+                <span className="tech-mark" style={{ background: t.color }} aria-hidden="true">
+                  {t.short}
+                </span>
+                <div className="tech-meta">
+                  <strong>{t.name}</strong>
+                  <span>{t.role}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="files-section">
         <h2>My Files</h2>
         <label className="upload">
-          {progress !== null ? `Uploading… ${progress}%` : "Upload .tgz"}
+          {progress !== null ? `Uploading… ${progress}%` : "Upload .tgz / .zip"}
           <input
             type="file"
-            accept=".tgz,.tar.gz"
+            accept=".tgz,.tar.gz,.zip"
             hidden
             disabled={progress !== null}
             onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])}
@@ -275,15 +318,56 @@ function FilesPage() {
             ))}
             {files.length === 0 && (
               <tr>
-                <td colSpan={6}>No files uploaded yet.</td>
+                <td colSpan={6}>No files uploaded yet — drop a tech-support or GP log archive above.</td>
               </tr>
             )}
           </tbody>
         </table>
+        </section>
       </main>
     </div>
   );
 }
+
+const CAPABILITY_TAGS = [
+  "Firewall TS",
+  "GlobalProtect",
+  "Boolean Search",
+  "Counter Graphs",
+  "Config Browser",
+  "Anomalies",
+  "OOM Analysis",
+  "HIP Reports",
+];
+
+const FEATURE_TILES = [
+  {
+    icon: "↑",
+    title: "Upload & detect",
+    body: "Drop a .tgz or .zip. The app detects firewall vs GlobalProtect agent and opens the right tabs.",
+  },
+  {
+    icon: "⌕",
+    title: "Search like grep",
+    body: "AND / OR / NOT, phrases, -A/-B context, and awk-style field filters across the whole archive.",
+  },
+  {
+    icon: "◈",
+    title: "Graph & diagnose",
+    body: "Plot counters, spot anomalies and OOM events, and walk GlobalProtect connection stages.",
+  },
+];
+
+const TECH_TILES = [
+  { name: "Go", short: "Go", role: "API & parsers", blurb: "HTTP API and regex parsers", color: "#00ADD8" },
+  { name: "React", short: "Re", role: "UI", blurb: "Interactive analysis UI", color: "#61DAFB" },
+  { name: "TypeScript", short: "TS", role: "Frontend", blurb: "Typed React + Vite", color: "#3178C6" },
+  { name: "Vite", short: "Vi", role: "Build", blurb: "Fast frontend tooling", color: "#646CFF" },
+  { name: "TimescaleDB", short: "Db", role: "Time-series", blurb: "Postgres + hypertables", color: "#FDB515" },
+  { name: "Redis", short: "Rd", role: "Job queue", blurb: "Async parse jobs", color: "#DC382D" },
+  { name: "MinIO", short: "S3", role: "Object store", blurb: "S3-compatible archives", color: "#C72E49" },
+  { name: "Docker", short: "Dk", role: "Runtime", blurb: "Compose stack", color: "#2496ED" },
+];
 
 function kindTitle(f: TsFile): string {
   const base =
