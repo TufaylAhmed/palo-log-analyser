@@ -1,18 +1,40 @@
-# analyser
+# PAN Log Analyser
 
 <p align="center">
-  <img src="frontend/public/pan-mark.svg" alt="analyser mark" width="56" height="56" />
+  <img src="frontend/public/pan-mark.svg" alt="PAN Log Analyser mark" width="64" height="64" />
 </p>
 
 <p align="center">
-  <strong>analyser</strong><br/>
-  Palo Alto support bundles, in a single native binary.<br/>
+  <img src="https://img.shields.io/badge/Palo%20Alto-Log%20Analyser-FA582D?style=for-the-badge" alt="Palo Alto Log Analyser" />
+  <img src="https://img.shields.io/badge/PAN--OS-Support%20Bundles-00ADEF?style=for-the-badge" alt="PAN-OS" />
+  <img src="https://img.shields.io/badge/GlobalProtect-Collections-7B2D8E?style=for-the-badge" alt="GlobalProtect" />
+</p>
+
+<p align="center">
+  <strong>PAN Log Analyser</strong><br/>
+  Support bundles in a single native binary.<br/>
   Browse · Trends · Analysis — no Docker required.
 </p>
 
 <p align="center">
   <a href="https://www.npmjs.com/package/palo-log-analyser"><img src="https://img.shields.io/npm/v/palo-log-analyser?style=flat-square" alt="npm" /></a>
   <a href="https://github.com/TufaylAhmed/palo-log-analyser/releases"><img src="https://img.shields.io/github/v/release/TufaylAhmed/palo-log-analyser?style=flat-square" alt="release" /></a>
+  <a href=".github/workflows/ci.yml"><img src="https://img.shields.io/badge/CI-GitHub%20Actions-2088FF?style=flat-square&logo=githubactions&logoColor=white" alt="CI" /></a>
+  <img src="https://img.shields.io/badge/status-active-success?style=flat-square" alt="Status" />
+</p>
+
+### Tech stack
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Go-00ADD8?style=for-the-badge&logo=go&logoColor=white" alt="Go" />
+  <img src="https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB" alt="React" />
+  <img src="https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript" />
+  <img src="https://img.shields.io/badge/Vite-646CFF?style=for-the-badge&logo=vite&logoColor=white" alt="Vite" />
+  <br/>
+  <img src="https://img.shields.io/badge/TimescaleDB-FDB515?style=for-the-badge&logo=postgresql&logoColor=black" alt="TimescaleDB" />
+  <img src="https://img.shields.io/badge/Redis-DC382D?style=for-the-badge&logo=redis&logoColor=white" alt="Redis" />
+  <img src="https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white" alt="Docker" />
+  <img src="https://img.shields.io/badge/Nginx-009639?style=for-the-badge&logo=nginx&logoColor=white" alt="Nginx" />
 </p>
 
 ```bash
@@ -43,7 +65,7 @@ palo-log-analyser open
 Or one-shot:
 
 ```bash
-npx palo-log-analyser@0.2.0 start
+npx palo-log-analyser@0.3.1 start
 ```
 
 Default mode runs a **native binary** (API + UI on one port): http://127.0.0.1:8080  
