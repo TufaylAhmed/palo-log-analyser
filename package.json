@@ -1,7 +1,7 @@
 {
   "name": "palo-log-analyser",
-  "version": "0.3.0",
-  "description": "Upload, parse, search, and diagnose Palo Alto Networks firewall tech-support and GlobalProtect agent log archives.",
+  "version": "0.3.1",
+  "description": "Native Palo Alto support-bundle analyser — browse, trends, and analysis in one binary.",
   "keywords": [
     "palo-alto",
     "pan-os",

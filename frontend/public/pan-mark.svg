@@ -1,13 +1,31 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" aria-hidden="true">
-  <!-- Original geometric mark (not the official Palo Alto Networks trademark). -->
+  <!-- Original mark: letter P + sparkline (not an official trademark). -->
   <defs>
-    <linearGradient id="panGrad" x1="8" y1="8" x2="56" y2="56" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#FF6A3D"/>
+    <linearGradient id="pInk" x1="10" y1="8" x2="34" y2="56" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FF7A45"/>
       <stop offset="1" stop-color="#FA582D"/>
     </linearGradient>
+    <linearGradient id="gInk" x1="36" y1="40" x2="56" y2="20" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#64D2FF"/>
+      <stop offset="1" stop-color="#0A84FF"/>
+    </linearGradient>
   </defs>
-  <rect width="64" height="64" rx="14" fill="#121212"/>
-  <path d="M12 42 L32 14 L52 42 H42 L32 28 L22 42 Z" fill="url(#panGrad)"/>
-  <path d="M18 48 L32 28 L46 48 H38.5 L32 38 L25.5 48 Z" fill="#FF8A5C" opacity="0.9"/>
-  <circle cx="32" cy="46" r="3.2" fill="#FFFFFF"/>
+  <rect width="64" height="64" rx="14" fill="#0A0A0A"/>
+  <!-- Stylized P -->
+  <path
+    d="M16 50 V14 H30.5 C38.2 14 43 18.6 43 25.6 C43 32.7 38.2 37.2 30.5 37.2 H24.2 V50 H16 Z M24.2 21.2 V30 H30 C33.6 30 35.6 28.1 35.6 25.6 C35.6 23.1 33.6 21.2 30 21.2 H24.2 Z"
+    fill="url(#pInk)"
+  />
+  <!-- Mini log/analysis sparkline + bars -->
+  <path
+    d="M38 44 L42 36 L46 40 L51 24 L56 30"
+    stroke="url(#gInk)"
+    stroke-width="2.4"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    fill="none"
+  />
+  <rect x="39" y="46" width="3.2" height="6" rx="1" fill="#64D2FF" opacity="0.85"/>
+  <rect x="44.5" y="43" width="3.2" height="9" rx="1" fill="#0A84FF" opacity="0.9"/>
+  <rect x="50" y="40" width="3.2" height="12" rx="1" fill="#FA582D" opacity="0.95"/>
 </svg>

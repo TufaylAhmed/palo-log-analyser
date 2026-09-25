@@ -1,63 +1,36 @@
-# Palo Log Analyser
+# analyser
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Palo%20Alto-Tech%20Support-FA582D?style=for-the-badge" alt="Palo Alto Tech Support" />
-  <img src="https://img.shields.io/badge/PAN--OS-Firewall%20TS-00ADEF?style=for-the-badge" alt="PAN-OS" />
-  <img src="https://img.shields.io/badge/GlobalProtect-Agent%20Logs-7B2D8E?style=for-the-badge" alt="GlobalProtect" />
+  <img src="frontend/public/pan-mark.svg" alt="analyser mark" width="56" height="56" />
 </p>
 
 <p align="center">
-  <strong>PAN TechSupport Analyzer</strong><br/>
-  Upload, parse, search, and diagnose Palo Alto Networks firewall tech-support<br/>
-  archives and GlobalProtect agent log collections — in the browser.
+  <strong>analyser</strong><br/>
+  Palo Alto support bundles, in a single native binary.<br/>
+  Browse · Trends · Analysis — no Docker required.
 </p>
 
 <p align="center">
-  <a href="#architecture"><img src="https://img.shields.io/badge/domain-firewall%20%7C%20GP-14202E?style=flat-square" alt="Domain" /></a>
-  <a href=".github/workflows/ci.yml"><img src="https://img.shields.io/badge/CI-GitHub%20Actions-2088FF?style=flat-square&logo=githubactions&logoColor=white" alt="CI" /></a>
-  <img src="https://img.shields.io/badge/status-active-success?style=flat-square" alt="Status" />
-  <img src="https://img.shields.io/badge/license-private-lightgrey?style=flat-square" alt="License" />
+  <a href="https://www.npmjs.com/package/palo-log-analyser"><img src="https://img.shields.io/npm/v/palo-log-analyser?style=flat-square" alt="npm" /></a>
+  <a href="https://github.com/TufaylAhmed/palo-log-analyser/releases"><img src="https://img.shields.io/github/v/release/TufaylAhmed/palo-log-analyser?style=flat-square" alt="release" /></a>
 </p>
 
-### Tech stack
-
-<p align="center">
-  <img src="https://img.shields.io/badge/Go-00ADD8?style=for-the-badge&logo=go&logoColor=white" alt="Go" />
-  <img src="https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB" alt="React" />
-  <img src="https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript" />
-  <img src="https://img.shields.io/badge/Vite-646CFF?style=for-the-badge&logo=vite&logoColor=white" alt="Vite" />
-  <br/>
-  <img src="https://img.shields.io/badge/TimescaleDB-FDB515?style=for-the-badge&logo=postgresql&logoColor=black" alt="TimescaleDB" />
-  <img src="https://img.shields.io/badge/Redis-DC382D?style=for-the-badge&logo=redis&logoColor=white" alt="Redis" />
-  <img src="https://img.shields.io/badge/MinIO-C72E49?style=for-the-badge&logo=minio&logoColor=white" alt="MinIO" />
-  <img src="https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white" alt="Docker" />
-  <img src="https://img.shields.io/badge/Nginx-009639?style=for-the-badge&logo=nginx&logoColor=white" alt="Nginx" />
-</p>
-
-<p align="center">
-  <img src="https://img.shields.io/badge/Backend-Go%20stdlib-00ADD8?style=flat-square&logo=go&logoColor=white" alt="Go backend" />
-  <img src="https://img.shields.io/badge/Frontend-React%20%2B%20TS-61DAFB?style=flat-square&logo=react&logoColor=black" alt="React frontend" />
-  <img src="https://img.shields.io/badge/Compose-multi--service-2496ED?style=flat-square&logo=docker&logoColor=white" alt="Docker Compose" />
-  <img src="https://img.shields.io/badge/Search-trigram%20%2B%20boolean-2F6FED?style=flat-square" alt="Search" />
-  <img src="https://img.shields.io/badge/Graphs-Dygraphs-E67E22?style=flat-square" alt="Graphs" />
-</p>
+```bash
+npx palo-log-analyser@0.3.1 start
+# → http://127.0.0.1:8080
+```
 
 ---
 
 ## What it does
 
-| | Capability |
+| | |
 |---|---|
-| 🔥 | **Firewall tech-support** — system info, logs, counters, config, OOM / anomalies |
-| 🛡️ | **GlobalProtect agent** — connection stages, gateway select, HIP, auth |
-| 🔎 | **Boolean search** — `AND` / `OR` / `NOT`, phrases, `-A`/`-B`, awk-style `| $2 > n` |
-| 📈 | **Counter graphs** — pan / zoom time-series across monitor dumps |
-| ⚙️ | **Config browser** — Policies / Objects / Network / Device style nav |
+| **PAN-OS bundle** | Snapshot, browse, trends, blueprint, entitlements, analysis |
+| **GP collection** | Path, sign-in, host check, browse, analysis |
+| **Find** | Boolean search with context across the archive |
 
-```bash
-npx palo-log-analyser@0.2.0 start
-# UI/API → http://127.0.0.1:8080   (no Docker)
-```
+---
 
 ### npm (CLI) — no Docker required
 

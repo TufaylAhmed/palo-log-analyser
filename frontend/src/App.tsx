@@ -27,8 +27,8 @@ interface TsFile {
 type ArchiveKind = "firewall" | "gp-agent" | "unknown";
 
 const KIND_LABEL: Record<ArchiveKind, string> = {
-  firewall: "Firewall",
-  "gp-agent": "GP agent",
+  firewall: "PAN-OS bundle",
+  "gp-agent": "GP collection",
   unknown: "Unrecognised",
 };
 
@@ -115,26 +115,25 @@ function logStateFor(fileId: string): LogFilesState {
   return st;
 }
 
-/* Anomalies leads and is therefore the landing tab, since tabsFor(...)[0] is
-   what a newly opened file selects. It was previously a sub-tab of Graphs,
-   which buried the one view that answers "what is wrong with this box". */
+/* Landing tab is tabsFor(...)[0]. Order and labels are deliberately different
+   from the upstream layout so the product reads as its own tool. */
 const FIREWALL_TABS: { id: Tab; label: string }[] = [
-  { id: "anomalies", label: "Insights" },
-  { id: "system", label: "Overview" },
-  { id: "logs", label: "Logs" },
-  { id: "graphs", label: "Metrics" },
-  { id: "appstats", label: "Apps" },
-  { id: "licenses", label: "Licenses" },
-  { id: "config", label: "Config" },
+  { id: "logs", label: "Browse" },
+  { id: "config", label: "Blueprint" },
+  { id: "graphs", label: "Trends" },
+  { id: "licenses", label: "Entitlements" },
+  { id: "anomalies", label: "Analysis" },
+  { id: "appstats", label: "Workloads" },
+  { id: "system", label: "Snapshot" },
 ];
 
 const GP_TABS: { id: Tab; label: string }[] = [
-  { id: "gp-overview", label: "Overview" },
-  { id: "gp-connection", label: "Connection" },
-  { id: "gp-auth", label: "Identity" },
-  { id: "gp-hip", label: "HIP" },
-  { id: "logs", label: "Logs" },
-  { id: "gp-anomalies", label: "Insights" },
+  { id: "gp-connection", label: "Path" },
+  { id: "gp-auth", label: "Sign-in" },
+  { id: "logs", label: "Browse" },
+  { id: "gp-hip", label: "Host check" },
+  { id: "gp-anomalies", label: "Analysis" },
+  { id: "gp-overview", label: "Snapshot" },
 ];
 
 function tabsFor(kind: ArchiveKind | undefined): { id: Tab; label: string }[] {
@@ -258,7 +257,7 @@ function FilesPage() {
           </label>
         }
       >
-        <a className="topbar-link active" href="/">Library</a>
+        <a className="topbar-link active" href="/">Archives</a>
       </AppTopBar>
       <main className="content landing">
         <section className="landing-hero" aria-label="Introduction">
@@ -266,8 +265,7 @@ function FilesPage() {
             <BrandLockup />
           </div>
           <p className="landing-lead">
-            Diagnose firewall tech-support archives and GlobalProtect collections
-            with search, metrics, and guided insights — quietly, precisely.
+            Drop a support bundle. Read signals, not screenshots.
           </p>
           <div className="capability-tags" aria-label="Capabilities">
             {CAPABILITY_TAGS.map((t, i) => (
@@ -290,8 +288,8 @@ function FilesPage() {
 
         <section className="files-section">
         <div className="section-head">
-          <h2>Library</h2>
-          <p className="section-sub">Your uploaded archives</p>
+          <h2>Archives</h2>
+          <p className="section-sub">Uploaded bundles</p>
         </div>
         {error && <p className="error">{error}</p>}
         <div className="table-card">
@@ -355,14 +353,14 @@ function FilesPage() {
 }
 
 const CAPABILITY_TAGS = [
-  "Firewall",
+  "PAN-OS",
   "GlobalProtect",
-  "Search",
-  "Metrics",
-  "Config",
-  "Insights",
+  "Find",
+  "Trends",
+  "Blueprint",
+  "Analysis",
   "Memory",
-  "HIP",
+  "Host check",
 ];
 
 const FEATURE_TILES = [
@@ -374,8 +372,8 @@ const FEATURE_TILES = [
         <path d="M5 19h14" strokeLinecap="round" />
       </svg>
     ),
-    title: "Ingest",
-    body: "Drop a .tgz or .zip. Kind is detected automatically and the right workspace opens.",
+    title: "Collect",
+    body: "Drop a .tgz or .zip — kind is detected for you.",
   },
   {
     icon: (
@@ -384,8 +382,8 @@ const FEATURE_TILES = [
         <path d="M16.5 16.5L21 21" strokeLinecap="round" />
       </svg>
     ),
-    title: "Search",
-    body: "Boolean queries, phrases, context lines, and field filters across the whole archive.",
+    title: "Find",
+    body: "Boolean search with context across the whole bundle.",
   },
   {
     icon: (
@@ -396,8 +394,8 @@ const FEATURE_TILES = [
         <path d="M20 19V8" strokeLinecap="round" />
       </svg>
     ),
-    title: "Diagnose",
-    body: "Metrics, insights, OOM signals, and GlobalProtect connection stages — in one place.",
+    title: "Explain",
+    body: "Trends, findings, and path stages in one workspace.",
   },
 ];
 
@@ -813,7 +811,7 @@ function GpAnomaliesTab({ fileId, portal, setPortal, onOpenLine }: GpTabProps) {
 
   return (
     <div className="gp-anomalies">
-      <h2>Insights</h2>
+      <h2>Analysis</h2>
       <GpPortalPicker portals={data.portals} portal={portal} setPortal={setPortal} />
       {(sig?.groups?.length ?? 0) > 0 && (
         <SignatureFindings sig={sig} err={null} onOpenLine={onOpenLine ?? (() => {})} />
@@ -1044,7 +1042,7 @@ function GpAuthTab({ fileId, portal, setPortal }: GpTabProps) {
 
   return (
     <div className="gp-auth">
-      <h2>Identity</h2>
+      <h2>Sign-in</h2>
       <GpPortalPicker portals={data.portals} portal={portal} setPortal={setPortal} />
       <div className="gp-verdict">
         <strong>{all.length} authentication{all.length === 1 ? "" : "s"}</strong>
@@ -1162,9 +1160,9 @@ function GpHipTab({ fileId, portal, setPortal }: GpTabProps) {
   if (!hip) {
     return (
       <div className="gp-pending">
-        <h2>HIP</h2>
+        <h2>Host check</h2>
         <p className="muted">
-          No HIP report was found in this bundle. The agent writes one into
+          No host-check report was found in this bundle. The agent writes one into
           PanGPS.log after each tunnel comes up, and also leaves a copy in
           pan_gp_hrpt.xml.
         </p>
@@ -1187,7 +1185,7 @@ function GpHipTab({ fileId, portal, setPortal }: GpTabProps) {
 
   return (
     <div className="gp-hip">
-      <h2>HIP report</h2>
+      <h2>Host check report</h2>
       <GpPortalPicker
         portals={data.portals}
         portal={portal}
@@ -1383,11 +1381,11 @@ function GpOverviewTab({ fileId, portal, setPortal }: GpTabProps) {
       ["HIP generated", o.hip_generated],
     ],
   ];
-  const titles = ["Connection", "Endpoint", "Last HIP report"];
+  const titles = ["Path", "Endpoint", "Last host check"];
 
   return (
     <div className="gp-overview">
-      <h2>Overview</h2>
+      <h2>Snapshot</h2>
       <GpPortals portals={data.portals} portal={portal} setPortal={setPortal} />
       {o.first_seen && (
         <p className="muted">
@@ -1954,7 +1952,7 @@ function GpConnectionTab({ fileId, portal, setPortal }: GpTabProps) {
 
   return (
     <div className="gp-timeline-wrap">
-      <h2>Connection</h2>
+      <h2>Path</h2>
       <GpPortalPicker portals={data.portals} portal={portal} setPortal={setPortal} />
       <GpFlow data={data} portal={portal} />
       <h3 className="gp-h3">Event log</h3>
@@ -2006,7 +2004,7 @@ function GpPending({ title, what }: { title: string; what: string }) {
       <h2>{title}</h2>
       <p>{what}</p>
       <p className="muted">
-        Not built yet. The archive is already indexed, so <strong>Log Files</strong> works
+        Not built yet. The archive is already indexed, so <strong>Browse</strong> works
         now: every log in the bundle is browsable and searchable with the full query
         language, including <code>-A</code>/<code>-B</code> context and the{" "}
         <code>| $2 &gt; n</code> field filter.
@@ -2142,12 +2140,12 @@ function FileView({ id }: { id: string }) {
     return (
       <div className="page">
         <AppTopBar>
-          <a className="topbar-link" href="/">Library</a>
+          <a className="topbar-link" href="/">Archives</a>
         </AppTopBar>
         <main className="content">
           <h2>File not found</h2>
           <p>
-            <a className="file-link" href="/">← Back to Library</a>
+            <a className="file-link" href="/">← Back to Archives</a>
           </p>
         </main>
       </div>
@@ -2168,7 +2166,7 @@ function FileView({ id }: { id: string }) {
           </div>
         }
       >
-        <a className="topbar-link" href="/" title="Back to Library">Library</a>
+        <a className="topbar-link" href="/" title="Back to Archives">Archives</a>
         <span className="topbar-sep" aria-hidden="true" />
         {tabs.map((t) => (
           <button
@@ -2582,7 +2580,7 @@ function AnomaliesTab({
 
   return (
     <section>
-      <h2>Insights</h2>
+      <h2>Analysis</h2>
       <div className="cfg-subtabs graphs-subtabs">
         <button className={view === "findings" ? "active" : ""} onClick={() => setView("findings")}>
           Findings
@@ -2765,7 +2763,7 @@ function Graphs({ fileId }: { fileId: string }) {
 
   return (
     <section>
-      <h2>Metrics</h2>
+      <h2>Trends</h2>
       <div style={pane("counters")}>
         <CounterGraphs fileId={fileId} visible={true} />
       </div>
@@ -4810,7 +4808,7 @@ function ConfigTab({ fileId }: { fileId: string }) {
 
   return (
     <section>
-      <h2>Config</h2>
+      <h2>Blueprint</h2>
       {err && <p className="error">{err}</p>}
       {!doc && !err && <p className="muted">Loading…</p>}
 
@@ -5586,7 +5584,7 @@ function LogFiles({ fileId }: { fileId: string }) {
 
   return (
     <section>
-      <h2>Logs</h2>
+      <h2>Browse</h2>
       <ArchiveSearch
         fileId={fileId}
         onOpen={openFromSearch}
@@ -6712,7 +6710,7 @@ function LogViewerPage({ fileId }: { fileId: string }) {
       >
         <a className="topbar-link" href={`/files/${fileId}`}>Workspace</a>
         <span className="topbar-sep" aria-hidden="true" />
-        <span className="topbar-link active">Logs</span>
+        <span className="topbar-link active">Browse</span>
       </AppTopBar>
       <main className="content">
         {(from || to) && (
@@ -6741,7 +6739,7 @@ function SystemInfo({ fileId }: { fileId: string }) {
 
   return (
     <section>
-      <h2>Overview</h2>
+      <h2>Snapshot</h2>
       {err && <p className="error">{err}</p>}
       {info && (
         <div className="kv-grid">
@@ -6860,12 +6858,12 @@ function AppStatsTab({ fileId }: { fileId: string }) {
     else { setSortKey(k); setAsc(false); }
   };
 
-  if (err) return <section><h2>Apps</h2><p className="error">{err}</p></section>;
-  if (!doc) return <section><h2>Apps</h2><p className="muted">Loading…</p></section>;
+  if (err) return <section><h2>Workloads</h2><p className="error">{err}</p></section>;
+  if (!doc) return <section><h2>Workloads</h2><p className="muted">Loading…</p></section>;
 
   return (
     <section>
-      <h2>Apps</h2>
+      <h2>Workloads</h2>
       <div className="cfg-source">
         <span className="cfg-source-path">{doc.source || "—"}</span>
         {doc.source === "panio_infreq" && (
@@ -6967,14 +6965,14 @@ function LicensesTab({ fileId }: { fileId: string }) {
       );
   }, [fileId]);
 
-  if (err) return <section><h2>Licenses</h2><p className="error">{err}</p></section>;
-  if (!lics) return <section><h2>Licenses</h2><p className="muted">Loading…</p></section>;
+  if (err) return <section><h2>Entitlements</h2><p className="error">{err}</p></section>;
+  if (!lics) return <section><h2>Entitlements</h2><p className="muted">Loading…</p></section>;
 
   const expiredCount = lics.filter((l) => (l.expired ?? "").toLowerCase() === "yes").length;
 
   return (
     <section>
-      <h2>Licenses</h2>
+      <h2>Entitlements</h2>
       <div className="mem-stats">
         <Stat label="Installed" value={String(lics.length)} />
         <Stat label="Expired" value={String(expiredCount)} bad={expiredCount > 0} />
