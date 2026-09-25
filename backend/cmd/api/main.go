@@ -1,6 +1,8 @@
 package main
 
 import (
+	"embed"
+	"io/fs"
 	"log"
 	"net/http"
 	"os"
@@ -9,10 +11,16 @@ import (
 	"pan-ts-analyzer/internal/store"
 )
 
+// Populated at release/npm build time from frontend/dist. Docker backend
+// builds keep only the placeholder so the image stays API-only (nginx serves UI).
+//
+//go:embed all:web
+var embeddedWeb embed.FS
+
 func main() {
 	port := os.Getenv("API_PORT")
 	if port == "" {
-		port = "8081"
+		port = "8080"
 	}
 	uploadDir := os.Getenv("UPLOAD_DIR")
 	if uploadDir == "" {
@@ -26,8 +34,13 @@ func main() {
 	st := store.NewMemory()
 	srv := api.NewServer(st, uploadDir)
 
-	log.Printf("api listening on :%s", port)
-	if err := http.ListenAndServe(":"+port, srv); err != nil {
+	var handler http.Handler = srv
+	if sub, err := fs.Sub(embeddedWeb, "web"); err == nil {
+		handler = srv.WithUI(sub)
+	}
+
+	log.Printf("palo-log-analyser listening on http://127.0.0.1:%s", port)
+	if err := http.ListenAndServe(":"+port, handler); err != nil {
 		log.Fatal(err)
 	}
 }

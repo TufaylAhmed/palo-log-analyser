@@ -1,4 +1,4 @@
-.PHONY: dev test build up down
+.PHONY: dev test build up down native
 
 test:
 	cd backend && go vet ./... && go test ./...
@@ -6,6 +6,9 @@ test:
 build:
 	cd backend && go build ./...
 	cd frontend && npm install && npm run build
+
+native:
+	bash scripts/build-native.sh
 
 up:
 	docker compose up --build -d

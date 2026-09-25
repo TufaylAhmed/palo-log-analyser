@@ -3,6 +3,7 @@ node_modules/
 dist/
 frontend/dist/
 backend/bin/
+bin/native/
 *.exe
 
 # env & secrets
@@ -14,6 +15,7 @@ backend/bin/
 data/
 uploads/
 *.tgz
+!scripts/**
 
 # editor/os
 .vscode/

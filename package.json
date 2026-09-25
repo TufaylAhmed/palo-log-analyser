@@ -1,6 +1,6 @@
 {
   "name": "palo-log-analyser",
-  "version": "0.1.4",
+  "version": "0.2.0",
   "description": "Upload, parse, search, and diagnose Palo Alto Networks firewall tech-support and GlobalProtect agent log archives.",
   "keywords": [
     "palo-alto",
@@ -27,7 +27,9 @@
     "palo-log-analyser": "bin/palo-log-analyser.js"
   },
   "files": [
-    "bin/",
+    "bin/palo-log-analyser.js",
+    "bin/native/",
+    "scripts/build-native.sh",
     "backend/cmd/",
     "backend/internal/",
     "backend/migrations/",
@@ -47,6 +49,8 @@
     "README.md"
   ],
   "scripts": {
+    "build:native": "bash scripts/build-native.sh",
+    "prepack": "npm run build:native",
     "start": "node bin/palo-log-analyser.js start",
     "stop": "node bin/palo-log-analyser.js stop",
     "status": "node bin/palo-log-analyser.js status"

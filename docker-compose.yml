@@ -7,6 +7,8 @@ services:
       # Let Go's GC work against the container limit instead of discovering it
       # by being killed. Keep this below mem_limit.
       GOMEMLIMIT: "3GiB"
+      API_PORT: "8081"
+      UPLOAD_DIR: "/data/uploads"
     ports:
       # UI proxies /api → api:8081 on the compose network. Host 8081 is often
       # taken by other stacks; publish a high port only for direct API access.

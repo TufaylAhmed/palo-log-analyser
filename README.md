@@ -55,38 +55,40 @@
 | ⚙️ | **Config browser** — Policies / Objects / Network / Device style nav |
 
 ```bash
-cp .env.example .env
-docker compose up --build
-# UI  → http://localhost:8080
-# API → http://localhost:8081/healthz
+npx palo-log-analyser@0.2.0 start
+# UI/API → http://127.0.0.1:8080   (no Docker)
 ```
 
-### npm (CLI)
-
-Requires [Docker Desktop](https://docs.docker.com/get-docker/) (or Engine + Compose v2).
-
-**Public npmjs.org**
+### npm (CLI) — no Docker required
 
 ```bash
 npm install -g palo-log-analyser
-palo-log-analyser doctor
 palo-log-analyser start
 palo-log-analyser open
 ```
 
-Or one-shot without installing:
+Or one-shot:
 
 ```bash
-npx palo-log-analyser start
+npx palo-log-analyser@0.2.0 start
 ```
 
-**GitHub Packages** (shows under the repo’s Packages sidebar)
+Default mode runs a **native binary** (API + UI on one port): http://127.0.0.1:8080  
+Data lives in `~/.palo-log-analyser/`.
+
+| Command | What it does |
+|---------|----------------|
+| `start` | start local server (no Docker) |
+| `start --docker` | optional Docker Compose stack |
+| `stop` | stop local server |
+| `status` | running / stopped |
+| `open` | open the UI |
+| `doctor` | check binary / Go / Docker |
+
+**GitHub Packages**
 
 ```bash
-# ~/.npmrc
-# @tufaylahmed:registry=https://npm.pkg.github.com
-# //npm.pkg.github.com/:_authToken=YOUR_GITHUB_TOKEN
-
+# ~/.npmrc — @tufaylahmed:registry=https://npm.pkg.github.com
 npm install -g @tufaylahmed/palo-log-analyser
 ```
 
@@ -94,15 +96,16 @@ Package pages:
 - npmjs: https://www.npmjs.com/package/palo-log-analyser
 - GitHub: https://github.com/TufaylAhmed/palo-log-analyser/pkgs/npm/palo-log-analyser
 
-| Command | What it does |
-|---------|----------------|
-| `start` | `docker compose up --build -d` |
-| `stop` | tear the stack down |
-| `restart` | stop + start |
-| `status` | compose `ps` |
-| `logs` | follow service logs |
-| `open` | open http://localhost:8080 |
-| `doctor` | check Docker / Compose |
+### Docker (optional)
+
+```bash
+cp .env.example .env
+docker compose up --build
+# UI  → http://localhost:8080
+# API → http://localhost:18081/healthz
+```
+
+Or: `palo-log-analyser start --docker`
 
 ---
 
