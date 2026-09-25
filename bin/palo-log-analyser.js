@@ -42,6 +42,8 @@ After start:
   API → ${API}
 
 Requires Docker Desktop (or Docker Engine + Compose v2).
+Default stack is api + frontend only (in-memory store). Optional
+Postgres/Redis/worker: docker compose --profile full up
 `.trim();
 
 function die(msg, code = 1) {

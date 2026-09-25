@@ -11,7 +11,6 @@ services:
       - "8081:8081"
     volumes:
       - upload-data:/data/uploads
-    depends_on: [postgres, redis, minio]
     # a parse that still runs the container out of memory should come back
     # rather than leave nginx talking to a dead upstream (502 Bad Gateway)
     restart: unless-stopped
@@ -23,10 +22,16 @@ services:
     env_file: .env
     volumes:
       - upload-data:/data/uploads
-    depends_on: [postgres, redis, minio]
+    # Stub today — enable with: docker compose --profile full up
+    profiles: ["full"]
 
+  # Target backing stores (not used by the in-memory Phase-1 API yet).
+  # Start with: docker compose --profile full up --build
+  # MinIO Community images were removed from Docker Hub (Sep 2026); when you
+  # need object storage, build MinIO from source or swap in another S3 target.
   postgres:
     image: timescale/timescaledb:latest-pg16
+    profiles: ["full"]
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-pantsa}
       POSTGRES_USER: ${POSTGRES_USER:-pantsa}
@@ -39,19 +44,9 @@ services:
 
   redis:
     image: redis:7-alpine
+    profiles: ["full"]
     volumes:
       - redis-data:/data
-
-  minio:
-    image: minio/minio:latest
-    command: server /data --console-address ":9001"
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-pantsa}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-change-me-too}
-    volumes:
-      - minio-data:/data
-    ports:
-      - "9001:9001"
 
   frontend:
     build: ./frontend
@@ -63,5 +58,4 @@ services:
 volumes:
   pg-data:
   redis-data:
-  minio-data:
   upload-data:
