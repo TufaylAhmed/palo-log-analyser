@@ -1,0 +1,62 @@
+{
+  "name": "palo-log-analyser",
+  "version": "0.1.0",
+  "description": "Upload, parse, search, and diagnose Palo Alto Networks firewall tech-support and GlobalProtect agent log archives.",
+  "keywords": [
+    "palo-alto",
+    "pan-os",
+    "globalprotect",
+    "tech-support",
+    "firewall",
+    "log-analyser",
+    "log-analyzer",
+    "tsf"
+  ],
+  "homepage": "https://github.com/TufaylAhmed/palo-log-analyser#readme",
+  "bugs": {
+    "url": "https://github.com/TufaylAhmed/palo-log-analyser/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TufaylAhmed/palo-log-analyser.git"
+  },
+  "license": "UNLICENSED",
+  "author": "Tufail Ahmed Sheikh",
+  "type": "module",
+  "bin": {
+    "palo-log-analyser": "bin/palo-log-analyser.js"
+  },
+  "files": [
+    "bin/",
+    "backend/cmd/",
+    "backend/internal/",
+    "backend/migrations/",
+    "backend/Dockerfile",
+    "backend/go.mod",
+    "frontend/src/",
+    "frontend/Dockerfile",
+    "frontend/index.html",
+    "frontend/nginx.conf",
+    "frontend/package.json",
+    "frontend/package-lock.json",
+    "frontend/tsconfig.json",
+    "frontend/vite.config.ts",
+    "docker-compose.yml",
+    ".env.example",
+    "Makefile",
+    "README.md"
+  ],
+  "scripts": {
+    "start": "node bin/palo-log-analyser.js start",
+    "stop": "node bin/palo-log-analyser.js stop",
+    "status": "node bin/palo-log-analyser.js status"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "os": [
+    "darwin",
+    "linux",
+    "win32"
+  ]
+}

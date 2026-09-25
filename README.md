@@ -61,6 +61,33 @@ docker compose up --build
 # API → http://localhost:8081/healthz
 ```
 
+### npm (CLI)
+
+Requires [Docker Desktop](https://docs.docker.com/get-docker/) (or Engine + Compose v2).
+
+```bash
+npm install -g palo-log-analyser
+palo-log-analyser doctor
+palo-log-analyser start
+palo-log-analyser open
+```
+
+Or one-shot without installing:
+
+```bash
+npx palo-log-analyser start
+```
+
+| Command | What it does |
+|---------|----------------|
+| `start` | `docker compose up --build -d` |
+| `stop` | tear the stack down |
+| `restart` | stop + start |
+| `status` | compose `ps` |
+| `logs` | follow service logs |
+| `open` | open http://localhost:8080 |
+| `doctor` | check Docker / Compose |
+
 ---
 
 ## Architecture
