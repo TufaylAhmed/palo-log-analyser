@@ -65,6 +65,8 @@ docker compose up --build
 
 Requires [Docker Desktop](https://docs.docker.com/get-docker/) (or Engine + Compose v2).
 
+**Public npmjs.org**
+
 ```bash
 npm install -g palo-log-analyser
 palo-log-analyser doctor
@@ -77,6 +79,20 @@ Or one-shot without installing:
 ```bash
 npx palo-log-analyser start
 ```
+
+**GitHub Packages** (shows under the repo’s Packages sidebar)
+
+```bash
+# ~/.npmrc
+# @tufaylahmed:registry=https://npm.pkg.github.com
+# //npm.pkg.github.com/:_authToken=YOUR_GITHUB_TOKEN
+
+npm install -g @tufaylahmed/palo-log-analyser
+```
+
+Package pages:
+- npmjs: https://www.npmjs.com/package/palo-log-analyser
+- GitHub: https://github.com/TufaylAhmed/palo-log-analyser/pkgs/npm/palo-log-analyser
 
 | Command | What it does |
 |---------|----------------|

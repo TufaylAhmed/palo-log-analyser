@@ -1,0 +1,14 @@
+---
+description: All commits and authorship must be the user only — never Cursor
+alwaysApply: true
+---
+
+# Authorship
+
+- Attribute all work to **Tufail Ahmed Sheikh** / GitHub **TufaylAhmed** only.
+- Never add `Co-authored-by: Cursor`, `cursoragent@cursor.com`, or any Cursor/AI co-author trailer.
+- Never mention Cursor, Composer, or an AI agent in commit messages, file headers, README, LICENSE, package.json `author`, or code comments as the author.
+- When committing or pushing, use author/committer:
+  - Name: `Tufail Ahmed Sheikh`
+  - Email: `59045955+TufaylAhmed@users.noreply.github.com`
+- Do not amend published history solely to re-attribute unless the user asks.
