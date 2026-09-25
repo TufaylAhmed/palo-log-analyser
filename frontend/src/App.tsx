@@ -216,6 +216,11 @@ function FilesPage() {
       )}
       <main className="content landing">
         <section className="landing-hero" aria-label="Introduction">
+          <div className="shield-row shield-row-product" aria-label="Product badges">
+            {PRODUCT_SHIELDS.map((s) => (
+              <img key={s.alt} className="shield" src={s.src} alt={s.alt} height={28} />
+            ))}
+          </div>
           <p className="landing-eyebrow">Palo Alto Networks · Tech Support</p>
           <h1 className="brand">PAN TechSupport Analyzer</h1>
           <p className="landing-lead">
@@ -231,6 +236,29 @@ function FilesPage() {
           </div>
         </section>
 
+        <section className="arch-section" aria-label="Architecture">
+          <h2 className="section-label">Architecture</h2>
+          <div className="arch-diagram" role="img" aria-label="Browser to Nginx to Go API, with TimescaleDB, Redis, MinIO, and Worker">
+            <div className="arch-flow">
+              <div className="arch-node arch-browser">Browser</div>
+              <span className="arch-arrow" aria-hidden="true">→</span>
+              <div className="arch-node arch-fe">Nginx · React</div>
+              <span className="arch-arrow" aria-hidden="true">→</span>
+              <div className="arch-node arch-api">API · Go</div>
+              <span className="arch-arrow" aria-hidden="true">→</span>
+              <div className="arch-node arch-worker">Worker · Go</div>
+            </div>
+            <div className="arch-data">
+              <div className="arch-node arch-db">TimescaleDB</div>
+              <div className="arch-node arch-redis">Redis</div>
+              <div className="arch-node arch-minio">MinIO</div>
+            </div>
+          </div>
+          <p className="arch-caption muted">
+            Target Compose layout — UI talks to the Go API; Redis feeds the worker; TimescaleDB and MinIO hold parsed data and raw archives.
+          </p>
+        </section>
+
         <section className="feature-tiles" aria-label="What you can do">
           {FEATURE_TILES.map((f, i) => (
             <article key={f.title} className="feature-tile" style={{ ["--i" as string]: i }}>
@@ -243,17 +271,16 @@ function FilesPage() {
 
         <section className="tech-section" aria-label="Technology stack">
           <h2 className="section-label">Built with</h2>
-          <div className="tech-grid">
-            {TECH_TILES.map((t, i) => (
-              <div key={t.name} className="tech-tile" style={{ ["--i" as string]: i }} title={t.blurb}>
-                <span className="tech-mark" style={{ background: t.color }} aria-hidden="true">
-                  {t.short}
-                </span>
-                <div className="tech-meta">
-                  <strong>{t.name}</strong>
-                  <span>{t.role}</span>
-                </div>
-              </div>
+          <div className="shield-row shield-row-tech">
+            {TECH_SHIELDS.map((s, i) => (
+              <img
+                key={s.alt}
+                className="shield"
+                src={s.src}
+                alt={s.alt}
+                height={28}
+                style={{ ["--i" as string]: i }}
+              />
             ))}
           </div>
         </section>
@@ -329,6 +356,33 @@ function FilesPage() {
   );
 }
 
+const PRODUCT_SHIELDS = [
+  {
+    alt: "Palo Alto Tech Support",
+    src: "https://img.shields.io/badge/Palo%20Alto-Tech%20Support-FA582D?style=for-the-badge",
+  },
+  {
+    alt: "PAN-OS Firewall TS",
+    src: "https://img.shields.io/badge/PAN--OS-Firewall%20TS-00ADEF?style=for-the-badge",
+  },
+  {
+    alt: "GlobalProtect Agent Logs",
+    src: "https://img.shields.io/badge/GlobalProtect-Agent%20Logs-7B2D8E?style=for-the-badge",
+  },
+];
+
+const TECH_SHIELDS = [
+  { alt: "Go", src: "https://img.shields.io/badge/Go-00ADD8?style=for-the-badge&logo=go&logoColor=white" },
+  { alt: "React", src: "https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB" },
+  { alt: "TypeScript", src: "https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white" },
+  { alt: "Vite", src: "https://img.shields.io/badge/Vite-646CFF?style=for-the-badge&logo=vite&logoColor=white" },
+  { alt: "TimescaleDB", src: "https://img.shields.io/badge/TimescaleDB-FDB515?style=for-the-badge&logo=postgresql&logoColor=black" },
+  { alt: "Redis", src: "https://img.shields.io/badge/Redis-DC382D?style=for-the-badge&logo=redis&logoColor=white" },
+  { alt: "MinIO", src: "https://img.shields.io/badge/MinIO-C72E49?style=for-the-badge&logo=minio&logoColor=white" },
+  { alt: "Docker", src: "https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white" },
+  { alt: "Nginx", src: "https://img.shields.io/badge/Nginx-009639?style=for-the-badge&logo=nginx&logoColor=white" },
+];
+
 const CAPABILITY_TAGS = [
   "Firewall TS",
   "GlobalProtect",
@@ -356,17 +410,6 @@ const FEATURE_TILES = [
     title: "Graph & diagnose",
     body: "Plot counters, spot anomalies and OOM events, and walk GlobalProtect connection stages.",
   },
-];
-
-const TECH_TILES = [
-  { name: "Go", short: "Go", role: "API & parsers", blurb: "HTTP API and regex parsers", color: "#00ADD8" },
-  { name: "React", short: "Re", role: "UI", blurb: "Interactive analysis UI", color: "#61DAFB" },
-  { name: "TypeScript", short: "TS", role: "Frontend", blurb: "Typed React + Vite", color: "#3178C6" },
-  { name: "Vite", short: "Vi", role: "Build", blurb: "Fast frontend tooling", color: "#646CFF" },
-  { name: "TimescaleDB", short: "Db", role: "Time-series", blurb: "Postgres + hypertables", color: "#FDB515" },
-  { name: "Redis", short: "Rd", role: "Job queue", blurb: "Async parse jobs", color: "#DC382D" },
-  { name: "MinIO", short: "S3", role: "Object store", blurb: "S3-compatible archives", color: "#C72E49" },
-  { name: "Docker", short: "Dk", role: "Runtime", blurb: "Compose stack", color: "#2496ED" },
 ];
 
 function kindTitle(f: TsFile): string {

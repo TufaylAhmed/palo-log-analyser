@@ -1,30 +1,121 @@
-# PAN TechSupport Analyzer
+# Palo Log Analyser
 
-Browser-based tool to upload, parse, and analyze Palo Alto Networks firewall tech-support files (`.tgz`).
+<p align="center">
+  <img src="https://img.shields.io/badge/Palo%20Alto-Tech%20Support-FA582D?style=for-the-badge" alt="Palo Alto Tech Support" />
+  <img src="https://img.shields.io/badge/PAN--OS-Firewall%20TS-00ADEF?style=for-the-badge" alt="PAN-OS" />
+  <img src="https://img.shields.io/badge/GlobalProtect-Agent%20Logs-7B2D8E?style=for-the-badge" alt="GlobalProtect" />
+</p>
+
+<p align="center">
+  <strong>PAN TechSupport Analyzer</strong><br/>
+  Upload, parse, search, and diagnose Palo Alto Networks firewall tech-support<br/>
+  archives and GlobalProtect agent log collections — in the browser.
+</p>
+
+<p align="center">
+  <a href="#architecture"><img src="https://img.shields.io/badge/domain-firewall%20%7C%20GP-14202E?style=flat-square" alt="Domain" /></a>
+  <a href=".github/workflows/ci.yml"><img src="https://img.shields.io/badge/CI-GitHub%20Actions-2088FF?style=flat-square&logo=githubactions&logoColor=white" alt="CI" /></a>
+  <img src="https://img.shields.io/badge/status-active-success?style=flat-square" alt="Status" />
+  <img src="https://img.shields.io/badge/license-private-lightgrey?style=flat-square" alt="License" />
+</p>
+
+### Tech stack
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Go-00ADD8?style=for-the-badge&logo=go&logoColor=white" alt="Go" />
+  <img src="https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB" alt="React" />
+  <img src="https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript" />
+  <img src="https://img.shields.io/badge/Vite-646CFF?style=for-the-badge&logo=vite&logoColor=white" alt="Vite" />
+  <br/>
+  <img src="https://img.shields.io/badge/TimescaleDB-FDB515?style=for-the-badge&logo=postgresql&logoColor=black" alt="TimescaleDB" />
+  <img src="https://img.shields.io/badge/Redis-DC382D?style=for-the-badge&logo=redis&logoColor=white" alt="Redis" />
+  <img src="https://img.shields.io/badge/MinIO-C72E49?style=for-the-badge&logo=minio&logoColor=white" alt="MinIO" />
+  <img src="https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white" alt="Docker" />
+  <img src="https://img.shields.io/badge/Nginx-009639?style=for-the-badge&logo=nginx&logoColor=white" alt="Nginx" />
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Backend-Go%20stdlib-00ADD8?style=flat-square&logo=go&logoColor=white" alt="Go backend" />
+  <img src="https://img.shields.io/badge/Frontend-React%20%2B%20TS-61DAFB?style=flat-square&logo=react&logoColor=black" alt="React frontend" />
+  <img src="https://img.shields.io/badge/Compose-multi--service-2496ED?style=flat-square&logo=docker&logoColor=white" alt="Docker Compose" />
+  <img src="https://img.shields.io/badge/Search-trigram%20%2B%20boolean-2F6FED?style=flat-square" alt="Search" />
+  <img src="https://img.shields.io/badge/Graphs-Dygraphs-E67E22?style=flat-square" alt="Graphs" />
+</p>
+
+---
+
+## What it does
+
+| | Capability |
+|---|---|
+| 🔥 | **Firewall tech-support** — system info, logs, counters, config, OOM / anomalies |
+| 🛡️ | **GlobalProtect agent** — connection stages, gateway select, HIP, auth |
+| 🔎 | **Boolean search** — `AND` / `OR` / `NOT`, phrases, `-A`/`-B`, awk-style `| $2 > n` |
+| 📈 | **Counter graphs** — pan / zoom time-series across monitor dumps |
+| ⚙️ | **Config browser** — Policies / Objects / Network / Device style nav |
+
+```bash
+cp .env.example .env
+docker compose up --build
+# UI  → http://localhost:8080
+# API → http://localhost:8081/healthz
+```
+
+---
 
 ## Architecture
 
-```
-browser ── nginx ──► api (Go) ──► postgres + timescaledb   (metadata, parsed values, counter time-series)
-                       │     ──► minio                     (raw .tgz blobs)
-                       └────────► redis ──► worker (Go)    (async extraction + regex parsers)
+Target layout (Compose services). Today the **api** still does inline parse + in-memory store; Postgres / MinIO / Redis / worker are wired for the production path.
+
+```mermaid
+flowchart LR
+  subgraph Client
+    B["Browser"]
+  end
+
+  subgraph Frontend
+    N["Nginx + React / Vite"]
+  end
+
+  subgraph Backend
+    A["API · Go"]
+    W["Worker · Go"]
+  end
+
+  subgraph Data
+    P[("TimescaleDB")]
+    R[("Redis")]
+    M[("MinIO")]
+  end
+
+  B --> N --> A
+  A --> P
+  A --> M
+  A --> R --> W
+  W --> P
+  W --> M
 ```
 
-- **api** — Go HTTP API: uploads, file registry, parsed-data queries, graph data
-- **worker** — Go: extracts `.tgz`, runs pluggable regex parsers, writes results to DB
-- **postgres (TimescaleDB)** — file metadata, system info, logs index, counter hypertables
-- **minio** — S3-compatible object storage for raw uploads
-- **redis** — job queue (asynq)
-- **frontend** — React + TypeScript (Vite), tabs: System Info · Logs · Graphs · Config · My Files
+| Service | Role |
+|---------|------|
+| **api** | Uploads, file registry, parsed-data queries, graph data |
+| **worker** | Extract `.tgz`, run regex parsers, write results |
+| **postgres (TimescaleDB)** | Metadata, system info, logs index, counter hypertables |
+| **minio** | S3-compatible storage for raw archives |
+| **redis** | Job queue (asynq) |
+| **frontend** | React + TypeScript (Vite) — System Info · Logs · Graphs · Config · My Files |
 
-> **Current state (vs. target above).** The diagram is the target. As built today,
-> the **api** is the only backend process doing real work: it stores raw `.tgz` files
-> on a **local disk volume** (not MinIO), keeps the file registry and all parsed data
-> in an **in-memory store** (not Postgres/TimescaleDB), and runs the parsers **inline
-> in a goroutine** right after upload (not via Redis/asynq in the **worker**, which is
-> still a stub). The store sits behind a `store.Store` interface so a Postgres-backed
-> implementation can drop in without touching the API or parsers. The Go backend is
-> currently **stdlib-only** (empty `go.mod` dependencies).
+```mermaid
+flowchart TB
+  U["Upload .tgz / .zip"] --> D{"Archive kind?"}
+  D -->|firewall markers| F["Firewall tabs"]
+  D -->|GP agent collection| G["GlobalProtect tabs"]
+  D -->|unknown| F
+  F --> FI["System · Logs · Graphs · Config · Anomalies"]
+  G --> GI["Overview · Connection · Auth · HIP · Logs · Anomalies"]
+```
+
+> **Current state (vs. target above).** As built today, the **api** is the only backend process doing real work: it stores raw `.tgz` files on a **local disk volume** (not MinIO), keeps the file registry and all parsed data in an **in-memory store** (not Postgres/TimescaleDB), and runs the parsers **inline in a goroutine** right after upload (not via Redis/asynq in the **worker**, which is still a stub). The store sits behind a `store.Store` interface so a Postgres-backed implementation can drop in without touching the API or parsers. The Go backend is currently **stdlib-only** (empty `go.mod` dependencies).
 
 ### Two kinds of archive
 
@@ -54,11 +145,21 @@ scaffolded.
 
 #### Connection flow
 
+```mermaid
+flowchart LR
+  A["Portal<br/>pre-login"] --> B["Portal<br/>auth"]
+  B --> C["Portal<br/>config"]
+  C --> D["Network<br/>discovery"]
+  D --> E["Gateway<br/>select"]
+  E --> F["Gateway<br/>auth"]
+  F --> G["Tunnel"]
+  G --> H["HIP"]
+```
+
 A connection is a fixed sequence, each stage reachable only if the one before it
-succeeded: portal pre-login → portal auth → portal config → network discovery →
-gateway select → gateway auth → tunnel → HIP. Each attempt in the log is segmented and
-scored against that sequence, so the Connection tab reports *where* it stopped rather
-than only that it failed — "57 attempts, 37 stopped at gateway select" is the diagnosis.
+succeeded. Each attempt in the log is segmented and scored against that sequence, so
+the Connection tab reports *where* it stopped rather than only that it failed —
+"57 attempts, 37 stopped at gateway select" is the diagnosis.
 
 Gateway selection gets its own table, because the agent's error for every failure there
 is the same unhelpful sentence about the network being unreachable. The table shows each
