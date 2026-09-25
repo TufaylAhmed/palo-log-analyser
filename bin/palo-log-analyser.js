@@ -19,7 +19,7 @@ const ENV_EXAMPLE = join(ROOT, ".env.example");
 const ENV_FILE = join(ROOT, ".env");
 
 const UI = "http://localhost:8080";
-const API = "http://localhost:8081/healthz";
+const API = "http://localhost:18081/healthz";
 
 const HELP = `
 palo-log-analyser — Palo Alto tech-support & GlobalProtect log analyser
